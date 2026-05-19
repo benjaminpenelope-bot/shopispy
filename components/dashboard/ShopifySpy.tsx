@@ -54,7 +54,9 @@ export function ShopifySpy() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      if (!text) throw new Error("Le serveur n'a pas répondu. Réessaie dans quelques secondes.");
+      const data = JSON.parse(text);
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
       setResult(data);
       setState("done");

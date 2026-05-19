@@ -14,6 +14,8 @@ function normalizeShopifyUrl(input: string): string {
   }
 }
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
   try {
     const res = await fetch(`${baseUrl}/products.json?limit=250`, {
       headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -60,12 +62,15 @@ export async function POST(request: NextRequest) {
   // Top 6 produits (les premiers = mis en avant)
   const topProducts = products.slice(0, 6);
 
-  // 3. Facebook Ads sur les 3 premiers produits
+  // 3. Facebook Ads sur les 3 premiers produits (avec timeout global de 8s)
   const topProductsWithAds = await Promise.all(
     topProducts.map(async (p, i) => {
       const keyword = p.title.split(" ").slice(0, 4).join(" ");
-      const adCount = i < 3 ? await countFacebookAds(keyword) : 0;
-      const satScore = i < 3 ? adCountToSaturation(adCount) : null;
+      const adCount = i < 3 ? await Promise.race([
+        countFacebookAds(keyword),
+        new Promise<number>(res => setTimeout(() => res(0), 5000)),
+      ]) : 0;
+      const satScore = i < 3 ? adCountToSaturation(adCount as number) : null;
       const price = parseFloat(p.variants?.[0]?.price ?? "0");
       const image = p.images?.[0]?.src ?? null;
       return {
@@ -128,7 +133,9 @@ Réponds UNIQUEMENT en JSON valide :
         const data = await res.json();
         aiAnalysis = JSON.parse(data.choices[0].message.content);
       }
-    } catch {}
+    } catch {
+      aiAnalysis = null;
+    }
   }
 
   return NextResponse.json({
