@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { countFacebookAds, adCountToSaturation } from "@/lib/facebook-ads";
+import { incrementUsage } from "@/lib/usage";
 
 function parseTags(tags: string | string[]): string[] {
   if (Array.isArray(tags)) return tags.map(t => t.trim()).filter(Boolean);
@@ -179,6 +180,9 @@ Réponds UNIQUEMENT en JSON valide :
       aiAnalysis = null;
     }
   }
+
+  // Incrémenter quota
+  await incrementUsage(user.id, "spy_scans");
 
   return NextResponse.json({
     url: baseUrl,

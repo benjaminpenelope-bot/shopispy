@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/types";
+import { incrementUsage } from "@/lib/usage";
 
 
 const SYSTEM_PROMPT = `Tu es un expert en e-commerce et copywriting francophone spécialisé Shopify.
@@ -102,6 +103,7 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
+    await incrementUsage(user.id, "clones");
     return NextResponse.json(content);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

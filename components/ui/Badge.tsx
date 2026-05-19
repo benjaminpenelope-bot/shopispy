@@ -10,14 +10,13 @@ export function Badge({ children, variant = "default", className }: BadgeProps) 
   return (
     <span
       className={cn(
-        "inline-flex items-center font-sans font-medium text-[0.72rem] px-2.5 py-0.5 rounded-full whitespace-nowrap",
+        "inline-flex items-center font-mono font-medium text-[0.65rem] px-2 py-0.5 rounded border whitespace-nowrap tracking-wide",
         {
-          "bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]": variant === "default",
-          "bg-[#eef2ff] text-primary border border-[#c7d2fe]": variant === "primary",
-          "bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0]": variant === "success",
-          "bg-[#fffbeb] text-[#d97706] border border-[#fde68a]": variant === "warning",
-          "bg-[#fef2f2] text-danger border border-[#fecaca]": variant === "danger",
-          "bg-transparent text-text-light border border-[#e5e7eb]": variant === "muted",
+          "bg-[#1a1a1a] text-[#71717a] border-[#2a2a2a]": variant === "default",
+          "bg-primary/10 text-primary border-primary/25": variant === "primary" || variant === "success",
+          "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/25": variant === "warning",
+          "bg-danger/10 text-danger border-danger/25": variant === "danger",
+          "bg-transparent text-[#52525b] border-[#1e1e1e]": variant === "muted",
         },
         className
       )}

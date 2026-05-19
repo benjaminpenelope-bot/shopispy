@@ -1,10 +1,11 @@
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
+import { ScanAnimation } from "@/components/landing/ScanAnimation";
 import { DemoMockup } from "@/components/landing/DemoMockup";
+import { WhyItWorks } from "@/components/landing/WhyItWorks";
 import { Features } from "@/components/landing/Features";
 import { Pricing } from "@/components/landing/Pricing";
 import { FAQ } from "@/components/landing/FAQ";
-import { Waitlist } from "@/components/landing/Waitlist";
 import { Footer } from "@/components/landing/Footer";
 
 export default function HomePage() {
@@ -13,11 +14,12 @@ export default function HomePage() {
       <Navbar />
       <main>
         <Hero />
+        <ScanAnimation />
         <DemoMockup />
+        <WhyItWorks />
         <Features />
         <Pricing />
         <FAQ />
-        <Waitlist />
       </main>
       <Footer />
     </>

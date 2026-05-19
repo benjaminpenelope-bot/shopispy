@@ -1,124 +1,75 @@
-import { Button } from "@/components/ui/Button";
-
-const PLANS = [
-  {
-    name: "Starter",
-    price: "29",
-    desc: "Pour tester et valider tes premières niches.",
-    features: [
-      "50 recherches / mois",
-      "Score saturation inclus",
-      "10 fiches IA / mois",
-      "Export CSV",
-    ],
-    cta: "Commencer",
-    highlight: false,
-    color: "bg-bg-soft",
-  },
-  {
-    name: "Pro",
-    price: "79",
-    desc: "Pour les ecommerçants actifs qui scalent.",
-    features: [
-      "Recherches illimitées",
-      "Score saturation avancé",
-      "Fiches IA illimitées",
-      "Mots-clés SEO complets",
-      "Alertes nouvelles niches",
-      "Support prioritaire",
-    ],
-    cta: "Passer Pro 🚀",
-    highlight: true,
-    color: "bg-gradient-to-b from-[#1e1b4b] to-[#312e81]",
-  },
-  {
-    name: "Agency",
-    price: "199",
-    desc: "Pour les agences et les multi-stores.",
-    features: [
-      "Tout ce qu'il y a dans Pro",
-      "5 membres d'équipe",
-      "API access",
-      "White-label export",
-      "Onboarding dédié",
-    ],
-    cta: "Nous contacter",
-    highlight: false,
-    color: "bg-bg-soft",
-  },
-];
-
 export function Pricing() {
   return (
-    <section className="py-24 bg-bg-soft" id="tarifs">
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center space-y-4 mb-16">
+    <section className="py-20 bg-[#080808]" id="tarifs">
+      <div className="max-w-lg mx-auto px-6">
+        <div className="text-center space-y-4 mb-12">
           <span className="section-tag">Tarifs</span>
-          <h2 className="font-heading font-extrabold text-4xl md:text-5xl text-ink tracking-tight">
-            Simple. <span className="gradient-text">Transparent.</span>
+          <h2 className="font-heading font-extrabold text-3xl md:text-4xl text-white tracking-tight">
+            Une offre. <span className="gradient-text">À vie.</span>
           </h2>
-          <p className="text-text-muted max-w-sm mx-auto">
-            Sans engagement. Annule quand tu veux. Essai gratuit inclus.
+          <p className="text-[#71717a] text-sm">
+            Places limitées pendant la beta.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-          {PLANS.map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover ${
-                plan.highlight
-                  ? "border-transparent shadow-glow relative"
-                  : "border-border shadow-card"
-              }`}
-            >
-              {plan.highlight && (
-                <div className="absolute -top-4 inset-x-0 flex justify-center z-10">
-                  <span className="bg-gradient-to-r from-primary to-secondary text-white text-[0.7rem] font-bold px-4 py-1.5 rounded-full shadow-glow-sm whitespace-nowrap">
-                    ⚡ Le plus populaire
-                  </span>
-                </div>
-              )}
+        <div className="relative">
+          {/* Badge */}
+          <div className="absolute -top-4 inset-x-0 flex justify-center z-10">
+            <span className="bg-primary text-[#080808] text-[0.7rem] font-bold px-4 py-1.5 rounded-full shadow-glow-sm font-mono tracking-wider">
+              ⚡ FOUNDERS ACCESS
+            </span>
+          </div>
 
-              <div className={`p-8 space-y-6 rounded-2xl overflow-hidden ${plan.color} ${plan.highlight ? "pt-10" : ""}`}>
-                <div>
-                  <div className={`font-sans text-xs font-bold uppercase tracking-widest ${plan.highlight ? "text-[#a5b4fc]" : "text-text-muted"}`}>
-                    {plan.name}
-                  </div>
-                  <div className={`font-heading font-extrabold text-4xl mt-1 ${plan.highlight ? "text-white" : "text-ink"}`}>
-                    {plan.price}€
-                    <span className={`font-sans text-sm font-normal ml-1 ${plan.highlight ? "text-[#a5b4fc]" : "text-text-muted"}`}>
-                      /mois
-                    </span>
-                  </div>
-                  <p className={`text-sm mt-2 ${plan.highlight ? "text-[#c7d2fe]" : "text-text-muted"}`}>
-                    {plan.desc}
-                  </p>
-                </div>
-
-                <ul className="space-y-2.5">
-                  {plan.features.map((f) => (
-                    <li key={f} className={`flex items-center gap-2.5 text-sm ${plan.highlight ? "text-[#e0e7ff]" : "text-ink/80"}`}>
-                      <span className={`text-base ${plan.highlight ? "text-[#a5b4fc]" : "text-success"}`}>✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                <Button
-                  variant={plan.highlight ? "secondary" : "outline"}
-                  className={`w-full ${plan.highlight ? "!bg-white !text-primary hover:!bg-bg-blue" : ""}`}
-                >
-                  {plan.cta}
-                </Button>
+          <div className="bg-[#0d1a0f] border border-primary/30 rounded-3xl p-8 pt-10 shadow-glow space-y-8">
+            {/* Prix */}
+            <div className="text-center">
+              <div className="font-heading font-extrabold text-6xl text-white">
+                59€
               </div>
+              <div className="font-mono text-xs text-primary mt-1 tracking-wider">ACCÈS À VIE</div>
+              <p className="text-[#71717a] text-sm mt-3">
+                Paiement unique. Zéro abonnement. Toutes les mises à jour incluses.
+              </p>
             </div>
-          ))}
-        </div>
 
-        <p className="text-center text-text-muted text-sm mt-8">
-          💳 Paiement sécurisé par Stripe · Pas de CB requise pour l'essai
-        </p>
+            {/* Features */}
+            <ul className="space-y-3">
+              {[
+                "Accès lifetime à toutes les fonctionnalités",
+                "Toutes les futures mises à jour incluses",
+                "Accès beta privée prioritaire",
+                "Support direct par message",
+                "Templates e-commerce inclus",
+                "Historique illimité des scans",
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-3 text-sm text-[#a1a1aa]">
+                  <span className="text-primary flex-shrink-0">✓</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            {/* CTA */}
+            <div className="space-y-3">
+              <a href="/login">
+                <button className="btn-neon w-full py-4 text-base font-bold">
+                  Rejoindre les fondateurs →
+                </button>
+              </a>
+              <p className="text-center font-mono text-xs text-[#52525b]">
+                🔒 Paiement sécurisé · Accès immédiat
+              </p>
+            </div>
+
+            {/* Rareté */}
+            <div className="bg-[#111111] border border-[#222] rounded-xl p-3 text-center">
+              <p className="font-mono text-xs text-[#71717a]">
+                <span className="text-primary font-bold">Places limitées</span> pendant la beta privée.
+                <br />Le prix augmentera au lancement public.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -91,3 +91,25 @@ $$;
 create trigger products_updated_at
   before update on public.products
   for each row execute function public.set_updated_at();
+
+
+-- ── User usage (quota) ───────────────────────────
+create table if not exists public.user_usage (
+  user_id   uuid references auth.users(id) on delete cascade,
+  month     char(7) not null, -- format "YYYY-MM"
+  searches  int not null default 0,
+  clones    int not null default 0,
+  spy_scans int not null default 0,
+  primary key (user_id, month)
+);
+
+alter table public.user_usage enable row level security;
+
+create policy "usage_own" on public.user_usage
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Permet l'upsert depuis le service role (API routes)
+create policy "usage_service" on public.user_usage
+  for all using (true)
+  with check (true);

@@ -30,28 +30,20 @@ export function ScoreBar({ score, label, className, colorMode = "trend", size = 
 
   const color =
     colorMode === "saturation"
-      ? score > 70 ? "#ef4444" : score > 40 ? "#f59e0b" : "#10b981"
-      : "#4f46e5";
-
-  const bgColor =
-    colorMode === "saturation"
-      ? score > 70 ? "#fef2f2" : score > 40 ? "#fffbeb" : "#ecfdf5"
-      : "#eef2ff";
+      ? score > 70 ? "#ef4444" : score > 40 ? "#f59e0b" : "#00ff87"
+      : "#00ff87";
 
   const textColor =
     colorMode === "saturation"
-      ? score > 70 ? "#ef4444" : score > 40 ? "#d97706" : "#059669"
-      : "#4f46e5";
+      ? score > 70 ? "#ef4444" : score > 40 ? "#f59e0b" : "#00ff87"
+      : "#00ff87";
 
   return (
     <div ref={ref} className={cn("space-y-1.5", className)}>
       {label && (
         <div className="flex justify-between items-center">
-          <span className="font-sans text-xs text-text-muted">{label}</span>
-          <span
-            className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded"
-            style={{ color: textColor, background: bgColor }}
-          >
+          <span className="font-mono text-xs text-[#52525b] truncate pr-2">{label}</span>
+          <span className="font-mono text-xs font-semibold flex-shrink-0" style={{ color: textColor }}>
             {score}/100
           </span>
         </div>

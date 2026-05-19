@@ -16,13 +16,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "inline-flex items-center justify-center font-sans font-semibold rounded-lg transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none",
           "hover:-translate-y-px active:translate-y-0",
           {
-            "bg-gradient-to-r from-primary to-secondary text-white shadow-glow-sm hover:shadow-glow hover:brightness-105":
+            "bg-primary text-[#080808] shadow-glow-sm hover:shadow-glow hover:bg-primary-dark":
               variant === "primary",
-            "bg-bg-blue text-primary border border-[#c7d2fe] hover:bg-[#e0e7ff] hover:border-primary":
+            "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20":
               variant === "secondary",
-            "bg-white text-primary border-2 border-primary hover:bg-bg-blue":
+            "bg-transparent text-primary border-2 border-primary/50 hover:bg-primary/10":
               variant === "outline",
-            "bg-transparent text-text-muted hover:text-ink hover:bg-bg-soft":
+            "bg-transparent text-[#71717a] hover:text-white hover:bg-white/5":
               variant === "ghost",
             "bg-danger text-white hover:bg-red-600":
               variant === "danger",
