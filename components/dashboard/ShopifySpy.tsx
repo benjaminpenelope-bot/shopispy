@@ -31,6 +31,7 @@ type TrafficData = {
     direct: number; search: number; social: number;
     email: number; paid: number; referral: number;
   } | null;
+  engagement: { bounceRate: number; pagesPerVisit: number; timeOnSite: number } | null;
 };
 
 type SpyResult = {
@@ -245,6 +246,20 @@ export function ShopifySpy() {
                     <div className="font-heading font-bold text-primary text-base">#{result.traffic.globalRank.toLocaleString("fr")}</div>
                     <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide">Rang mondial</div>
                   </div>
+                )}
+                {result.traffic.engagement && (
+                  <>
+                    <div className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center">
+                      <div className="text-lg mb-1">📄</div>
+                      <div className="font-heading font-bold text-primary text-base">{result.traffic.engagement.pagesPerVisit}</div>
+                      <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide">Pages/visite</div>
+                    </div>
+                    <div className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center">
+                      <div className="text-lg mb-1">⏱️</div>
+                      <div className="font-heading font-bold text-primary text-base">{Math.floor(result.traffic.engagement.timeOnSite / 60)}m{result.traffic.engagement.timeOnSite % 60}s</div>
+                      <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide">Durée moy.</div>
+                    </div>
+                  </>
                 )}
                 {result.traffic.topCountries.slice(0, 2).map(c => (
                   <div key={c.country} className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center">
