@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { countFacebookAds, adCountToSaturation } from "@/lib/facebook-ads";
+import { adCountToSaturation } from "@/lib/facebook-ads";
 import { incrementUsage } from "@/lib/usage";
+import { detectTheme, detectApps, fetchBestSellers, fetchTraffic } from "@/lib/shopify-intel";
 
 function parseTags(tags: string | string[]): string[] {
   if (Array.isArray(tags)) return tags.map(t => t.trim()).filter(Boolean);
@@ -20,7 +21,6 @@ function normalizeShopifyUrl(input: string): string {
   }
 }
 
-// Construit un keyword pertinent pour la recherche Facebook Ads
 function buildAdKeyword(product: any): string {
   if (product.product_type?.trim()) return product.product_type.trim();
   const tags = parseTags(product.tags ?? "");
@@ -33,14 +33,13 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  // Auth optionnelle — scan public autorisé, quota tracké si connecté
 
   const { url } = await request.json();
   if (!url) return NextResponse.json({ error: "URL manquante" }, { status: 400 });
 
   const baseUrl = normalizeShopifyUrl(url);
 
-  // 1. Fetch les produits publics de la boutique
+  // 1. Produits publics
   let products: any[] = [];
   try {
     const res = await fetch(`${baseUrl}/products.json?limit=250`, {
@@ -50,7 +49,7 @@ export async function POST(request: NextRequest) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     products = data.products ?? [];
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: "Impossible d'accéder à cette boutique. Vérifie que l'URL est correcte et que c'est bien une boutique Shopify." },
       { status: 422 }
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Aucun produit trouvé sur cette boutique." }, { status: 422 });
   }
 
-  // 2. Analyser les produits
+  // 2. Stats produits
   const prices = products.map(p => parseFloat(p.variants?.[0]?.price ?? "0")).filter(p => p > 0);
   const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
   const minPrice = Math.min(...prices);
@@ -72,57 +71,92 @@ export async function POST(request: NextRequest) {
   allTags.forEach(t => { tagCount[t] = (tagCount[t] ?? 0) + 1; });
   const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
 
-  // Types produits détectés
   const productTypes = [...new Set(products.map(p => p.product_type).filter(Boolean))].slice(0, 5);
-
   const topProducts = products.slice(0, 6);
 
-  // 3. Facebook Ads sur les 3 premiers produits avec keyword pertinent
-  const topProductsWithAds = await Promise.all(
-    topProducts.map(async (p, i) => {
-      const keyword = buildAdKeyword(p);
-      const adCount = i < 3 ? await Promise.race([
-        countFacebookAds(keyword),
-        new Promise<number>(res => setTimeout(() => res(0), 5000)),
-      ]) : 0;
-      const satScore = i < 3 ? adCountToSaturation(adCount as number) : null;
-      const price = parseFloat(p.variants?.[0]?.price ?? "0");
-      const image = p.images?.[0]?.src ?? null;
-      return {
-        id: p.id,
-        title: p.title,
-        price,
-        image,
-        adCount: i < 3 ? adCount : null,
-        saturation_score: satScore,
-        adKeyword: i < 3 ? keyword : null,
-        handle: p.handle,
-        productType: p.product_type,
-        tags: parseTags(p.tags ?? "").slice(0, 3),
-      };
-    })
-  );
+  // 3. Analyse HTML : thème + apps + best sellers + trafic — en parallèle
+  const [htmlResult, bestSellersRaw, trafficData] = await Promise.all([
+    // Fetch homepage pour thème et apps
+    (async () => {
+      try {
+        const res = await fetch(baseUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) return { theme: null, apps: [] };
+        const html = await res.text();
+        return { theme: detectTheme(html), apps: detectApps(html) };
+      } catch {
+        return { theme: null, apps: [] };
+      }
+    })(),
+    fetchBestSellers(baseUrl),
+    fetchTraffic(baseUrl.replace(/^https?:\/\//, "")),
+  ]);
 
-  // Score de saturation global basé sur la niche principale
+  const { theme, apps } = htmlResult;
+
+  // Best sellers : si trouvés via collection, sinon premiers produits
+  const bestSellersData = bestSellersRaw.length > 0 ? bestSellersRaw : products.slice(0, 6);
+  const bestSellers = bestSellersData.slice(0, 6).map(p => ({
+    id: p.id,
+    title: p.title,
+    price: parseFloat(p.variants?.[0]?.price ?? "0"),
+    image: p.images?.[0]?.src ?? null,
+    handle: p.handle,
+    productType: p.product_type ?? "",
+    tags: parseTags(p.tags ?? "").slice(0, 3),
+    fromCollection: bestSellersRaw.length > 0,
+  }));
+
+  // 4. Saturation niche (FB désactivé → 0)
+  const topProductsWithAds = topProducts.map(p => {
+    const keyword = buildAdKeyword(p);
+    const price = parseFloat(p.variants?.[0]?.price ?? "0");
+    const image = p.images?.[0]?.src ?? null;
+    return {
+      id: p.id,
+      title: p.title,
+      price,
+      image,
+      adCount: null,
+      saturation_score: null,
+      adKeyword: keyword,
+      handle: p.handle,
+      productType: p.product_type,
+      tags: parseTags(p.tags ?? "").slice(0, 3),
+    };
+  });
+
   const nicheKeyword = topTags[0] ?? productTypes[0] ?? "";
-  const nicheAdCount = nicheKeyword ? await Promise.race([
-    countFacebookAds(nicheKeyword),
-    new Promise<number>(res => setTimeout(() => res(0), 5000)),
-  ]) : 0;
-  const nicheSaturation = adCountToSaturation(nicheAdCount as number);
+  const nicheSaturation = adCountToSaturation(0);
+  const nicheAdCount = 0;
 
-  // 4. Analyse IA avec données enrichies
+  // 5. Analyse IA enrichie
   let aiAnalysis = null;
   if (process.env.OPENAI_API_KEY) {
     try {
-      const productSummary = topProducts.slice(0, 8).map(p => {
-        const keyword = buildAdKeyword(p);
-        return `- ${p.title} | Type: ${p.product_type || "N/A"} | Prix: ${p.variants?.[0]?.price}€`;
-      }).join("\n");
-
-      const adData = topProductsWithAds.slice(0, 3).map(p =>
-        `- "${p.adKeyword}": ${p.adCount} annonces FB actives → saturation ${p.saturation_score}/100`
+      const productSummary = topProducts.slice(0, 8).map(p =>
+        `- ${p.title} | Type: ${p.product_type || "N/A"} | Prix: ${p.variants?.[0]?.price}€`
       ).join("\n");
+
+      const bestSellersSummary = bestSellers.length > 0
+        ? `\nBEST SELLERS (${bestSellersRaw.length > 0 ? "collection officielle" : "premiers produits"}) :\n` +
+          bestSellers.map(p => `- ${p.title} | ${p.price}€`).join("\n")
+        : "";
+
+      const techSummary = [
+        theme ? `Thème Shopify : ${theme}` : "",
+        apps.length > 0 ? `Apps détectées : ${apps.join(", ")}` : "Aucune app détectée",
+        trafficData?.monthlyVisits ? `Trafic mensuel estimé : ${trafficData.monthlyVisits.toLocaleString("fr")} visites` : "",
+        trafficData?.globalRank ? `Classement mondial : #${trafficData.globalRank.toLocaleString("fr")}` : "",
+        trafficData?.topCountries?.length
+          ? `Top pays : ${trafficData.topCountries.map(c => `${c.country} ${c.share}%`).join(", ")}`
+          : "",
+        trafficData?.trafficSources
+          ? `Sources trafic — Direct: ${trafficData.trafficSources.direct}% | Search: ${trafficData.trafficSources.search}% | Social: ${trafficData.trafficSources.social}% | Paid: ${trafficData.trafficSources.paid}%`
+          : "",
+      ].filter(Boolean).join("\n");
 
       const prompt = `Tu es un expert en e-commerce dropshipping francophone. Analyse cette boutique Shopify avec des données réelles.
 
@@ -132,31 +166,31 @@ Nombre de produits : ${products.length}
 Types de produits : ${productTypes.join(", ") || "non renseignés"}
 Prix moyen : ${avgPrice.toFixed(2)}€ | min: ${minPrice}€ | max: ${maxPrice}€
 Tags principaux : ${topTags.join(", ")}
-Saturation de la niche "${nicheKeyword}" : ${nicheSaturation}/100 (basé sur ${nicheAdCount} annonces FB actives en France)
+
+STACK TECHNIQUE :
+${techSummary || "Non disponible"}
 
 TOP PRODUITS :
 ${productSummary}
-
-SATURATION PAR PRODUIT (annonces Facebook Ads actives en France) :
-${adData}
+${bestSellersSummary}
 
 GRILLE DE SCORING (score_boutique) :
-- 0-30 : Niche très saturée ou boutique peu viable pour le dropshipping
+- 0-30 : Niche très saturée ou boutique peu viable
 - 31-55 : Opportunités ciblées, positionnement différencié nécessaire
-- 56-75 : Bonne opportunité, marché accessible avec la bonne approche
-- 76-100 : Niche peu exploitée, fort potentiel de croissance
+- 56-75 : Bonne opportunité, marché accessible
+- 76-100 : Niche peu exploitée, fort potentiel
 
-Base ton score sur : la saturation réelle de la niche (donnée ci-dessus), la cohérence du catalogue, la gamme de prix (marges dropshipping possibles), et le potentiel de différenciation.
+Base ton score sur : la cohérence du catalogue, la gamme de prix (marges dropshipping), le potentiel de différenciation, et le niveau de sophistication de la stack tech (apps = budget marketing = boutique sérieuse).
 
 Réponds UNIQUEMENT en JSON valide :
 {
-  "niche_principale": "la niche principale de cette boutique",
+  "niche_principale": "la niche principale",
   "positionnement": "positionnement marché en 1 phrase",
   "points_forts": ["point fort 1", "point fort 2", "point fort 3"],
   "opportunites": ["opportunité actionnable 1", "opportunité actionnable 2"],
   "produit_a_surveiller": "titre exact du produit le plus intéressant",
   "conseil_principal": "conseil concret et actionnable en 2 phrases maximum",
-  "score_boutique": <nombre entre 0 et 100 selon la grille ci-dessus>
+  "score_boutique": <nombre entre 0 et 100>
 }`;
 
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -181,7 +215,6 @@ Réponds UNIQUEMENT en JSON valide :
     }
   }
 
-  // Incrémenter quota si connecté
   if (user) await incrementUsage(user.id, "spy_scans");
 
   return NextResponse.json({
@@ -194,6 +227,11 @@ Réponds UNIQUEMENT en JSON valide :
     nicheSaturation,
     nicheAdCount,
     topProducts: topProductsWithAds,
+    bestSellers,
+    bestSellersFromCollection: bestSellersRaw.length > 0,
+    theme,
+    detectedApps: apps,
+    traffic: trafficData,
     aiAnalysis,
   });
 }

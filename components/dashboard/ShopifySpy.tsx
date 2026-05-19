@@ -5,6 +5,34 @@ import { ScoreBar } from "@/components/ui/ScoreBar";
 import { ScoreGauge } from "@/components/ui/ScoreGauge";
 import { formatPrice } from "@/lib/utils";
 
+type Product = {
+  id: number;
+  title: string;
+  price: number;
+  image: string | null;
+  handle: string;
+  productType: string;
+  tags: string[];
+};
+
+type SpyProduct = Product & {
+  adCount: number | null;
+  saturation_score: number | null;
+  adKeyword: string | null;
+};
+
+type BestSeller = Product & { fromCollection: boolean };
+
+type TrafficData = {
+  monthlyVisits: number | null;
+  globalRank: number | null;
+  topCountries: { country: string; countryCode: string; share: number }[];
+  trafficSources: {
+    direct: number; search: number; social: number;
+    email: number; paid: number; referral: number;
+  } | null;
+};
+
 type SpyResult = {
   url: string;
   productCount: number;
@@ -14,18 +42,12 @@ type SpyResult = {
   topTags: string[];
   nicheSaturation?: number;
   nicheAdCount?: number;
-  topProducts: {
-    id: number;
-    title: string;
-    price: number;
-    image: string | null;
-    adCount: number | null;
-    saturation_score: number | null;
-    adKeyword: string | null;
-    handle: string;
-    productType: string;
-    tags: string[];
-  }[];
+  topProducts: SpyProduct[];
+  bestSellers: BestSeller[];
+  bestSellersFromCollection: boolean;
+  theme: string | null;
+  detectedApps: string[];
+  traffic: TrafficData | null;
   aiAnalysis: {
     niche_principale: string;
     positionnement: string;
@@ -39,11 +61,13 @@ type SpyResult = {
 
 type State = "idle" | "loading" | "done" | "error";
 
-const EXAMPLE_STORES = [
-  "gymshark.com",
-  "allbirds.com",
-  "colourpop.com",
-];
+const EXAMPLE_STORES = ["gymshark.com", "allbirds.com", "colourpop.com"];
+
+function formatVisits(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toString();
+}
 
 export function ShopifySpy() {
   const [url, setUrl] = useState("");
@@ -103,7 +127,7 @@ export function ShopifySpy() {
           </button>
         </div>
         <p className="text-[0.65rem] text-[#52525b] font-mono text-center tracking-wide">
-          Détection Shopify • Analyse marketing • Fiche produit IA
+          Thème • Apps • Best sellers • Trafic • Analyse IA
         </p>
       </div>
 
@@ -123,7 +147,7 @@ export function ShopifySpy() {
           <div className="space-y-2">
             <p className="font-heading font-bold text-white text-lg">Prêt à espionner</p>
             <p className="text-[#52525b] text-sm max-w-sm mx-auto">
-              Entre l'URL d'une boutique Shopify pour obtenir ses produits, scores de saturation et une analyse IA complète.
+              Entre l'URL d'une boutique Shopify pour obtenir ses best sellers, thème, apps, trafic et une analyse IA complète.
             </p>
           </div>
           <div className="space-y-2">
@@ -146,13 +170,13 @@ export function ShopifySpy() {
       {/* Skeleton */}
       {state === "loading" && (
         <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl h-28 overflow-hidden">
               <div className="h-full bg-gradient-to-r from-[#111] via-[#1a1a1a] to-[#111] animate-shimmer" style={{ backgroundSize: "200% 100%" }} />
             </div>
           ))}
           <p className="text-center text-[#52525b] text-xs font-mono animate-pulse">
-            Analyse en cours… ~10 secondes
+            Analyse en cours… thème · apps · best sellers · IA
           </p>
         </div>
       )}
@@ -160,7 +184,8 @@ export function ShopifySpy() {
       {/* Résultats */}
       {state === "done" && result && (
         <div className="space-y-4">
-          {/* Overview */}
+
+          {/* ── Overview ── */}
           <div className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-[#1a1a1a] flex items-center justify-between flex-wrap gap-3">
               <div>
@@ -174,24 +199,20 @@ export function ShopifySpy() {
                 <ScoreGauge score={result.aiAnalysis.score_boutique} label="Score potentiel" size={110} />
               )}
             </div>
-
-            {/* Métriques — surface élevée pour valeurs importantes */}
             <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: "Produits", val: result.productCount.toString(), icon: "📦" },
                 { label: "Prix moyen", val: `${result.avgPrice}€`, icon: "💰" },
                 { label: "Prix min", val: `${result.minPrice}€`, icon: "⬇️" },
-                { label: "Saturation niche", val: result.nicheSaturation != null ? `${result.nicheSaturation}/100` : "N/A", icon: "📊", sub: result.nicheAdCount ? `${result.nicheAdCount} pubs FB` : undefined },
-              ].map(({ label, val, icon, sub }: { label: string; val: string; icon: string; sub?: string }) => (
+                { label: "Prix max", val: `${result.maxPrice}€`, icon: "⬆️" },
+              ].map(({ label, val, icon }) => (
                 <div key={label} className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center">
                   <div className="text-lg mb-1">{icon}</div>
                   <div className="font-heading font-bold text-primary text-base">{val}</div>
                   <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide">{label}</div>
-                  {sub && <div className="font-mono text-[0.55rem] text-[#3f3f46] mt-0.5">{sub}</div>}
                 </div>
               ))}
             </div>
-
             {result.topTags.length > 0 && (
               <div className="px-5 pb-4 flex gap-2 flex-wrap">
                 {result.topTags.map(tag => <Badge key={tag}>{tag}</Badge>)}
@@ -199,12 +220,127 @@ export function ShopifySpy() {
             )}
           </div>
 
-          {/* Top produits */}
+          {/* ── Trafic ── */}
+          {result.traffic && (
+            <div className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider uppercase">Trafic mensuel estimé</p>
+              </div>
+              <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                {result.traffic.monthlyVisits && (
+                  <div className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center col-span-1">
+                    <div className="text-lg mb-1">👁️</div>
+                    <div className="font-heading font-bold text-primary text-base">{formatVisits(result.traffic.monthlyVisits)}</div>
+                    <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide">Visites/mois</div>
+                  </div>
+                )}
+                {result.traffic.globalRank && (
+                  <div className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center">
+                    <div className="text-lg mb-1">🌐</div>
+                    <div className="font-heading font-bold text-primary text-base">#{result.traffic.globalRank.toLocaleString("fr")}</div>
+                    <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide">Rang mondial</div>
+                  </div>
+                )}
+                {result.traffic.topCountries.slice(0, 2).map(c => (
+                  <div key={c.country} className="bg-[#161616] border border-[#222] rounded-xl p-3 text-center">
+                    <div className="text-lg mb-1">📍</div>
+                    <div className="font-heading font-bold text-white text-base">{c.share}%</div>
+                    <div className="font-mono text-[0.6rem] text-[#52525b] mt-0.5 tracking-wide truncate">{c.country}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Sources de trafic */}
+              {result.traffic.trafficSources && (
+                <div className="px-4 pb-4 space-y-2">
+                  <p className="font-mono text-[0.6rem] text-[#3f3f46] tracking-wider uppercase mb-3">Sources de trafic</p>
+                  {(
+                    [
+                      { label: "Direct",   val: result.traffic.trafficSources.direct,   color: "#00ff87" },
+                      { label: "Search",   val: result.traffic.trafficSources.search,   color: "#00e5ff" },
+                      { label: "Social",   val: result.traffic.trafficSources.social,   color: "#a78bfa" },
+                      { label: "Paid",     val: result.traffic.trafficSources.paid,     color: "#f59e0b" },
+                      { label: "Referral", val: result.traffic.trafficSources.referral, color: "#71717a" },
+                    ] as const
+                  ).filter(s => s.val > 0).map(({ label, val, color }) => (
+                    <div key={label} className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="font-mono text-xs text-[#52525b]">{label}</span>
+                        <span className="font-mono text-xs font-semibold" style={{ color }}>{val}%</span>
+                      </div>
+                      <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${val}%`, background: color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Top pays détail */}
+              {result.traffic.topCountries.length > 2 && (
+                <div className="px-4 pb-4">
+                  <p className="font-mono text-[0.6rem] text-[#3f3f46] tracking-wider uppercase mb-2">Répartition géo</p>
+                  <div className="flex flex-wrap gap-2">
+                    {result.traffic.topCountries.map(c => (
+                      <span key={c.country} className="bg-[#161616] border border-[#222] text-xs text-[#a1a1aa] font-mono px-2.5 py-1 rounded-lg">
+                        {c.country} · {c.share}%
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Thème + Apps ── */}
+          {(result.theme || result.detectedApps.length > 0) && (
+            <div className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-2xl p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider uppercase">Stack technique</p>
+              </div>
+              {result.theme && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm">🎨</span>
+                  <div>
+                    <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider">THÈME SHOPIFY</p>
+                    <p className="font-heading font-bold text-white text-sm mt-0.5">{result.theme}</p>
+                  </div>
+                </div>
+              )}
+              {result.detectedApps.length > 0 && (
+                <div>
+                  <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider mb-2">
+                    APPS DÉTECTÉES ({result.detectedApps.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {result.detectedApps.map(app => (
+                      <span key={app} className="bg-[#161616] border border-[#222] text-xs text-[#a1a1aa] font-mono px-2.5 py-1 rounded-lg hover:border-primary/20 transition-colors">
+                        {app}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Best sellers ── */}
           <div className="space-y-3">
-            <h3 className="font-heading font-bold text-base text-white">Top produits</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-heading font-bold text-base text-white">
+                {result.bestSellersFromCollection ? "Best sellers" : "Top produits"}
+              </h3>
+              {result.bestSellersFromCollection && (
+                <span className="font-mono text-[0.6rem] text-primary bg-primary/8 border border-primary/20 px-2 py-0.5 rounded-full tracking-wider">
+                  COLLECTION OFFICIELLE
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {result.topProducts.map(p => (
-                <div key={p.id} className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl overflow-hidden flex hover:border-[#2a2a2a] transition-colors group">
+              {result.bestSellers.map(p => (
+                <div key={p.id} className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl overflow-hidden flex hover:border-[#2a2a2a] transition-colors">
                   {p.image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.image} alt={p.title} className="w-20 h-20 object-cover flex-shrink-0" />
@@ -212,15 +348,11 @@ export function ShopifySpy() {
                   <div className="p-4 flex-1 space-y-2 min-w-0">
                     <p className="font-heading font-bold text-sm text-white leading-snug line-clamp-2">{p.title}</p>
                     <div className="flex items-center justify-between">
-                      {/* Prix sur surface surélevée */}
                       <span className="font-heading font-bold text-primary bg-primary/8 px-2 py-0.5 rounded-md text-sm">{formatPrice(p.price)}</span>
-                      {p.adCount !== null && (
-                        <span className="font-mono text-[0.65rem] text-[#52525b]">{p.adCount} pubs FB</span>
+                      {p.productType && (
+                        <span className="font-mono text-[0.65rem] text-[#52525b] truncate ml-2">{p.productType}</span>
                       )}
                     </div>
-                    {p.saturation_score !== null && p.adCount !== null && (
-                      <ScoreBar score={p.saturation_score} label={`"${p.adKeyword}"`} colorMode="saturation" />
-                    )}
                     {p.tags.length > 0 && (
                       <div className="flex gap-1 overflow-x-auto scrollbar-hide">
                         {p.tags.map(t => <Badge key={t}>{t}</Badge>)}
@@ -232,7 +364,24 @@ export function ShopifySpy() {
             </div>
           </div>
 
-          {/* Analyse IA */}
+          {/* ── Tous les produits avec saturation ── */}
+          {result.topProducts.some(p => p.saturation_score !== null) && (
+            <div className="space-y-3">
+              <h3 className="font-heading font-bold text-base text-white">Saturation par produit</h3>
+              <div className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl p-4 space-y-3">
+                {result.topProducts.filter(p => p.saturation_score !== null).map(p => (
+                  <ScoreBar
+                    key={p.id}
+                    score={p.saturation_score!}
+                    label={`${p.title.slice(0, 40)}${p.title.length > 40 ? "…" : ""} — "${p.adKeyword}"`}
+                    colorMode="saturation"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Analyse IA ── */}
           {result.aiAnalysis && (
             <div className="bg-[#0d1a0f] border border-primary/20 rounded-2xl p-5 space-y-5">
               <div className="flex items-center gap-2">
@@ -245,7 +394,6 @@ export function ShopifySpy() {
                   <p className="font-mono text-[0.6rem] text-[#52525b] uppercase tracking-wider">Positionnement</p>
                   <p className="text-sm text-[#a1a1aa] leading-relaxed">{result.aiAnalysis.positionnement}</p>
                 </div>
-                {/* Produit à surveiller — surface élevée */}
                 <div className="bg-[#111] border border-primary/15 rounded-xl p-3 space-y-1">
                   <p className="font-mono text-[0.6rem] text-primary uppercase tracking-wider">Produit à surveiller</p>
                   <p className="text-sm font-heading font-bold text-white">{result.aiAnalysis.produit_a_surveiller}</p>
@@ -275,7 +423,6 @@ export function ShopifySpy() {
                 </div>
               </div>
 
-              {/* Conseil — surface la plus élevée car c'est l'info clé */}
               <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
                 <p className="font-mono text-[0.6rem] text-[#52525b] uppercase tracking-wider mb-1.5">Conseil principal</p>
                 <p className="text-sm text-white leading-relaxed">{result.aiAnalysis.conseil_principal}</p>
