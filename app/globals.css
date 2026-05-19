@@ -27,8 +27,10 @@
   100% { opacity: 1; transform: translateX(0); }
 }
 @keyframes scanDown {
-  0%   { top: -5%; }
-  100% { top: 110%; }
+  0%   { top: -5%; opacity: 0; }
+  8%   { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { top: 110%; opacity: 0; }
 }
 
 html { scroll-behavior: smooth; }
