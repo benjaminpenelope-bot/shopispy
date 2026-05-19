@@ -211,7 +211,7 @@ export type TrafficData = {
 };
 
 export async function fetchTraffic(domain: string): Promise<TrafficData | null> {
-  const key = process.env.SIMILARWEB_RAPIDAPI_KEY;
+  const key = process.env.RAPIDAPI_KEY;
   if (!key) return null;
 
   try {
