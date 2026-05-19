@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
   const topProducts = products.slice(0, 6);
 
   // 3. Analyse HTML + fournisseurs AliExpress — en parallèle
-  const aliKeywords = topProducts.map(p => buildAdKeyword(p));
   const [htmlResult, bestSellersRaw, trafficData, similarSites, supplierResults] = await Promise.all([
     // Fetch homepage pour thème et apps
     (async (): Promise<{ theme: ThemeInfo | null; apps: string[] }> => {
@@ -100,8 +99,8 @@ export async function POST(request: NextRequest) {
     fetchBestSellers(baseUrl),
     fetchTraffic(baseUrl.replace(/^https?:\/\//, "")),
     fetchSimilarSites(baseUrl.replace(/^https?:\/\//, "")),
-    // AliExpress suppliers for each top product (parallel, non-blocking)
-    Promise.all(aliKeywords.map(kw => findSupplier(kw))),
+    // AliExpress: cherche par titre complet du produit pour meilleure pertinence
+    Promise.all(topProducts.map(p => findSupplier(p.title))),
   ]);
 
   const { theme, apps } = htmlResult;

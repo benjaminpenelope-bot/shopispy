@@ -57,20 +57,65 @@ export async function searchAliExpress(query: string, page = 1): Promise<AliProd
   });
 }
 
-/** Search AliExpress for a product keyword and return the best supplier match. */
-export async function findSupplier(keyword: string): Promise<AliSupplier | null> {
+// ─── Title matching helpers ──────────────────────────────────────────────────
+const STOP_WORDS = new Set([
+  "the","a","an","and","or","for","with","in","of","to","on","at","by","from",
+  "buy","best","new","set","pack","lot","pcs","piece","pieces","kit","pro","plus",
+  "max","mini","xl","xxl","size","color","black","white","red","blue","green",
+]);
+
+function titleTokens(title: string): string[] {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+}
+
+function matchScore(shopifyTitle: string, aliTitle: string): number {
+  const shopifyWords = new Set(titleTokens(shopifyTitle));
+  const aliWords = new Set(titleTokens(aliTitle));
+  let matches = 0;
+  for (const w of shopifyWords) {
+    if (aliWords.has(w)) matches++;
+  }
+  return matches;
+}
+
+/** Build a concise AliExpress search query from a Shopify product title. */
+function buildQuery(productTitle: string): string {
+  const tokens = titleTokens(productTitle);
+  // Keep first 5 meaningful tokens — specific enough for AliExpress
+  return tokens.slice(0, 5).join(" ");
+}
+
+/**
+ * Search AliExpress for a Shopify product and return the best-matching supplier.
+ * Returns null if no sufficiently similar result is found.
+ */
+export async function findSupplier(productTitle: string): Promise<AliSupplier | null> {
   if (!RAPIDAPI_KEY) return null;
+  const query = buildQuery(productTitle);
+  if (!query) return null;
+
   try {
     const results = await Promise.race([
-      searchAliExpress(keyword),
+      searchAliExpress(query),
       new Promise<null>((_, r) => setTimeout(() => r(null), 6000)),
     ]);
-    if (!results) return null;
+    if (!results || results.length === 0) return null;
 
-    // Pick first result with a valid price
-    const match = results.find(p => p.price > 0);
-    if (!match) return null;
+    // Score each result by title similarity and pick the best one
+    const scored = results
+      .filter(p => p.price > 0)
+      .map(p => ({ product: p, score: matchScore(productTitle, p.title) }))
+      .sort((a, b) => b.score - a.score);
 
+    // Require at least 2 words in common to avoid false matches
+    const best = scored[0];
+    if (!best || best.score < 2) return null;
+
+    const match = best.product;
     return {
       itemId: match.itemId,
       title: match.title,
