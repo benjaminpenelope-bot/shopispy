@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { ScoreBar } from "@/components/ui/ScoreBar";
+import { ScoreGauge } from "@/components/ui/ScoreGauge";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 
@@ -131,10 +132,7 @@ export function PublicScanner() {
                 <p className="font-heading font-bold text-white text-sm truncate max-w-xs">{result.url}</p>
               </div>
               {result.aiAnalysis && (
-                <div className="text-center">
-                  <div className="font-heading font-extrabold text-3xl text-primary">{result.aiAnalysis.score_boutique}/100</div>
-                  <div className="font-mono text-[0.6rem] text-[#52525b] tracking-wider">SCORE POTENTIEL</div>
-                </div>
+                <ScoreGauge score={result.aiAnalysis.score_boutique} label="Score potentiel" size={100} />
               )}
             </div>
             <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">

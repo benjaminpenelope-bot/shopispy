@@ -221,6 +221,11 @@ input::placeholder, textarea::placeholder { color: #52525b; }
   box-shadow: 0 0 32px rgba(0, 255, 135, 0.4);
   transform: translateY(-1px);
 }
+.btn-neon:active:not(:disabled) {
+  transform: scale(0.97) translateY(0);
+  box-shadow: 0 0 8px rgba(0, 255, 135, 0.2);
+  transition: all 0.08s;
+}
 .btn-neon:disabled {
   opacity: 0.5;
   cursor: not-allowed;

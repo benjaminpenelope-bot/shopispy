@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
+import { Inter, Syne, DM_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -8,10 +8,10 @@ const inter = Inter({
   display: "swap",
 });
 
-const jakarta = Plus_Jakarta_Sans({
+const syne = Syne({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-jakarta",
+  variable: "--font-syne",
   display: "swap",
 });
 
@@ -41,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${inter.variable} ${jakarta.variable} ${dmMono.variable}`}
+      className={`${inter.variable} ${syne.variable} ${dmMono.variable}`}
     >
       <body>{children}</body>
     </html>

@@ -1,3 +1,5 @@
+import { ScoreGauge } from "@/components/ui/ScoreGauge";
+
 export function DemoMockup() {
   return (
     <section className="py-20 bg-[#080808]" id="rapport">
@@ -18,13 +20,7 @@ export function DemoMockup() {
               <p className="font-mono text-xs text-[#52525b] mb-1">BOUTIQUE ANALYSÉE</p>
               <p className="font-heading font-bold text-white">gymshark-example.myshopify.com</p>
             </div>
-            <div className="text-center">
-              <div className="font-heading font-extrabold text-4xl text-primary">82</div>
-              <div className="font-mono text-[0.6rem] text-[#52525b] tracking-wider">WINNER SCORE</div>
-              <div className="w-24 bg-[#1a1a1a] rounded-full h-1.5 mt-1">
-                <div className="bg-primary h-1.5 rounded-full shadow-glow-sm" style={{ width: "82%" }} />
-              </div>
-            </div>
+            <ScoreGauge score={82} label="Winner Score" size={110} />
           </div>
 
           {/* Grid métriques */}
