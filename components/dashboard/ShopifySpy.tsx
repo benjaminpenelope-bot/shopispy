@@ -15,11 +15,20 @@ type Product = {
   tags: string[];
 };
 
+type AliSupplier = {
+  price: number;
+  salesInt: number;
+  rating: number;
+  itemUrl: string;
+  margin: number | null;
+};
+
 type SpyProduct = Product & {
   adCount: number | null;
   saturation_score: number | null;
   adKeyword: string | null;
   opportunityScore: number;
+  supplier: AliSupplier | null;
 };
 
 type SimilarSite = {
@@ -423,31 +432,71 @@ export function ShopifySpy({ initialUrl }: { initialUrl?: string }) {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <h3 className="font-heading font-bold text-base text-white">Score d'opportunité</h3>
-                <span className="font-mono text-[0.6rem] text-[#52525b] bg-[#161616] border border-[#222] px-2 py-0.5 rounded-full tracking-wider">PRODUITS</span>
+                {result.topProducts.some(p => p.supplier) && (
+                  <span className="font-mono text-[0.6rem] text-primary bg-primary/8 border border-primary/20 px-2 py-0.5 rounded-full tracking-wider">DONNÉES ALIEXPRESS</span>
+                )}
               </div>
               <div className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl overflow-hidden">
                 {[...result.topProducts]
                   .sort((a, b) => b.opportunityScore - a.opportunityScore)
                   .slice(0, 6)
-                  .map((p, i) => {
-                    const color = p.opportunityScore >= 80 ? "#00ff87" : p.opportunityScore >= 50 ? "#f59e0b" : "#71717a";
+                  .map((p, i, arr) => {
+                    const color = p.opportunityScore >= 75 ? "#00ff87" : p.opportunityScore >= 50 ? "#f59e0b" : "#71717a";
                     return (
-                      <div key={p.id} className={`flex items-center gap-4 px-4 py-3 ${i < result.topProducts.length - 1 ? "border-b border-[#161616]" : ""}`}>
-                        <span className="font-mono text-[0.65rem] text-[#3f3f46] w-4 flex-shrink-0">#{i + 1}</span>
-                        {p.image && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.image} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 opacity-80" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-white font-medium truncate">{p.title}</p>
-                          <p className="text-[0.65rem] text-[#52525b] font-mono">{p.price > 0 ? `${p.price}€` : "—"}{p.productType ? ` · ${p.productType}` : ""}</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-16 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${p.opportunityScore}%`, background: color }} />
+                      <div key={p.id} className={`px-4 py-3.5 space-y-2.5 ${i < arr.length - 1 ? "border-b border-[#161616]" : ""}`}>
+                        {/* Row 1: rank + image + title + score */}
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-[0.6rem] text-[#3f3f46] w-4 flex-shrink-0 text-center">#{i + 1}</span>
+                          {p.image && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.image} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 opacity-80" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-white font-medium truncate">{p.title}</p>
+                            <p className="text-[0.65rem] text-[#52525b] font-mono">{p.price > 0 ? `${p.price}€ Shopify` : "—"}{p.productType ? ` · ${p.productType}` : ""}</p>
                           </div>
-                          <span className="font-mono text-xs font-bold w-8 text-right" style={{ color }}>{p.opportunityScore}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="w-14 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${p.opportunityScore}%`, background: color }} />
+                            </div>
+                            <span className="font-mono text-xs font-bold w-7 text-right" style={{ color }}>{p.opportunityScore}</span>
+                          </div>
                         </div>
+
+                        {/* Row 2: AliExpress data chips */}
+                        {p.supplier ? (
+                          <div className="flex flex-wrap items-center gap-2 pl-7">
+                            <a
+                              href={p.supplier.itemUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 font-mono text-[0.65rem] text-[#ff6600] bg-[#ff6600]/8 border border-[#ff6600]/20 px-2.5 py-1 rounded-lg hover:bg-[#ff6600]/15 transition-colors"
+                            >
+                              <span>🛒</span>
+                              <span>{p.supplier.price.toFixed(2)}€ Ali</span>
+                              <span className="opacity-40">↗</span>
+                            </a>
+                            {p.supplier.margin !== null && (
+                              <span className={`font-mono text-[0.65rem] px-2.5 py-1 rounded-lg border ${p.supplier.margin >= 55 ? "text-primary border-primary/20 bg-primary/8" : p.supplier.margin >= 30 ? "text-[#f59e0b] border-[#f59e0b]/20 bg-[#f59e0b]/8" : "text-[#52525b] border-[#222] bg-[#161616]"}`}>
+                                {p.supplier.margin}% marge
+                              </span>
+                            )}
+                            {p.supplier.salesInt > 0 && (
+                              <span className="font-mono text-[0.65rem] text-[#71717a] bg-[#161616] border border-[#222] px-2.5 py-1 rounded-lg">
+                                {p.supplier.salesInt >= 1000 ? `${(p.supplier.salesInt / 1000).toFixed(1)}k` : p.supplier.salesInt} ventes
+                              </span>
+                            )}
+                            {p.supplier.rating > 0 && (
+                              <span className="font-mono text-[0.65rem] text-[#71717a] bg-[#161616] border border-[#222] px-2.5 py-1 rounded-lg">
+                                ★ {p.supplier.rating.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="pl-7">
+                            <span className="font-mono text-[0.6rem] text-[#3f3f46]">Produit non trouvé sur AliExpress</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

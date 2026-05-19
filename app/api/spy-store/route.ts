@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adCountToSaturation } from "@/lib/facebook-ads";
 import { incrementUsage } from "@/lib/usage";
 import { detectTheme, detectApps, fetchBestSellers, fetchTraffic, fetchSimilarSites, type ThemeInfo } from "@/lib/shopify-intel";
+import { findSupplier, computeOpportunityScore, type AliSupplier } from "@/lib/aliexpress";
 
 function parseTags(tags: string | string[]): string[] {
   if (Array.isArray(tags)) return tags.map(t => t.trim()).filter(Boolean);
@@ -79,8 +80,9 @@ export async function POST(request: NextRequest) {
   const productTypes = [...new Set(products.map(p => p.product_type).filter(Boolean))].slice(0, 5);
   const topProducts = products.slice(0, 6);
 
-  // 3. Analyse HTML : thème + apps + best sellers + trafic — en parallèle
-  const [htmlResult, bestSellersRaw, trafficData, similarSites] = await Promise.all([
+  // 3. Analyse HTML + fournisseurs AliExpress — en parallèle
+  const aliKeywords = topProducts.map(p => buildAdKeyword(p));
+  const [htmlResult, bestSellersRaw, trafficData, similarSites, supplierResults] = await Promise.all([
     // Fetch homepage pour thème et apps
     (async (): Promise<{ theme: ThemeInfo | null; apps: string[] }> => {
       try {
@@ -98,6 +100,8 @@ export async function POST(request: NextRequest) {
     fetchBestSellers(baseUrl),
     fetchTraffic(baseUrl.replace(/^https?:\/\//, "")),
     fetchSimilarSites(baseUrl.replace(/^https?:\/\//, "")),
+    // AliExpress suppliers for each top product (parallel, non-blocking)
+    Promise.all(aliKeywords.map(kw => findSupplier(kw))),
   ]);
 
   const { theme, apps } = htmlResult;
@@ -115,25 +119,26 @@ export async function POST(request: NextRequest) {
     fromCollection: bestSellersRaw.length > 0,
   }));
 
-  // 4. Saturation niche (FB désactivé → 0) + score d'opportunité produit
-  const topProductsWithAds = topProducts.map(p => {
+  // 4. Saturation niche (FB désactivé → 0) + score d'opportunité AliExpress
+  const suppliers = supplierResults as (AliSupplier | null)[];
+  const topProductsWithAds = topProducts.map((p, i) => {
     const keyword = buildAdKeyword(p);
     const price = parseFloat(p.variants?.[0]?.price ?? "0");
     const image = p.images?.[0]?.src ?? null;
     const variantCount = p.variants?.length ?? 1;
+    const supplier = suppliers[i] ?? null;
 
-    // Opportunity score: heuristic based on price range + variant simplicity + type presence
-    const priceScore = (() => {
-      if (price <= 0) return 0;
-      if (price >= 15 && price <= 80) return 40; // ideal dropshipping range
-      if (price > 80 && price <= 150) return 25;
-      if (price > 150) return 10;
-      return 15; // below 15€
-    })();
-    const variantScore = variantCount <= 3 ? 30 : variantCount <= 8 ? 20 : variantCount <= 15 ? 10 : 5;
-    const typeScore = p.product_type?.trim() ? 20 : 0;
-    const imageScore = p.images?.length > 0 ? 10 : 0;
-    const opportunityScore = Math.min(100, priceScore + variantScore + typeScore + imageScore);
+    const opportunityScore = computeOpportunityScore(
+      price,
+      supplier,
+      variantCount,
+      Boolean(p.product_type?.trim()),
+    );
+
+    // Compute margin if supplier found
+    const margin = supplier && price > 0 && supplier.price > 0
+      ? Math.round((price - supplier.price) / price * 100)
+      : null;
 
     return {
       id: p.id,
@@ -147,6 +152,13 @@ export async function POST(request: NextRequest) {
       productType: p.product_type,
       tags: parseTags(p.tags ?? "").slice(0, 3),
       opportunityScore,
+      supplier: supplier ? {
+        price: supplier.price,
+        salesInt: supplier.salesInt,
+        rating: supplier.rating,
+        itemUrl: supplier.itemUrl,
+        margin,
+      } : null,
     };
   });
 
