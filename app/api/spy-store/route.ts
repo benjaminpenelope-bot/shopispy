@@ -33,7 +33,7 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  // Auth optionnelle — scan public autorisé, quota tracké si connecté
 
   const { url } = await request.json();
   if (!url) return NextResponse.json({ error: "URL manquante" }, { status: 400 });
@@ -181,8 +181,8 @@ Réponds UNIQUEMENT en JSON valide :
     }
   }
 
-  // Incrémenter quota
-  await incrementUsage(user.id, "spy_scans");
+  // Incrémenter quota si connecté
+  if (user) await incrementUsage(user.id, "spy_scans");
 
   return NextResponse.json({
     url: baseUrl,

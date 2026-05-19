@@ -44,7 +44,7 @@ export function Navbar() {
               Connexion
             </button>
           </Link>
-          <Link href="/dashboard/spy">
+          <Link href="/scan">
             <button className="btn-neon px-4 py-2 text-sm">
               Scanner une boutique →
             </button>
@@ -86,7 +86,7 @@ export function Navbar() {
                 Connexion
               </button>
             </Link>
-            <Link href="/dashboard/spy" onClick={() => setOpen(false)}>
+            <Link href="/scan" onClick={() => setOpen(false)}>
               <button className="btn-neon w-full px-4 py-3 text-sm">
                 Scanner une boutique →
               </button>

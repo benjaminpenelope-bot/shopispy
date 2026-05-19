@@ -7,7 +7,7 @@ export function Hero() {
   const router = useRouter();
 
   function handleScan() {
-    router.push("/dashboard/spy");
+    router.push("/scan");
   }
 
   return (
