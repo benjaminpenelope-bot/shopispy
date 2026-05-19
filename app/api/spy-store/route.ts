@@ -11,13 +11,20 @@ function parseTags(tags: string | string[]): string[] {
 function normalizeShopifyUrl(input: string): string {
   let url = input.trim().toLowerCase();
   if (!url.startsWith("http")) url = "https://" + url;
-  // Retire le chemin pour garder juste le domaine
   try {
     const u = new URL(url);
     return u.origin;
   } catch {
     return url;
   }
+}
+
+// Construit un keyword pertinent pour la recherche Facebook Ads
+function buildAdKeyword(product: any): string {
+  if (product.product_type?.trim()) return product.product_type.trim();
+  const tags = parseTags(product.tags ?? "");
+  if (tags.length > 0) return tags[0];
+  return product.title.split(" ").slice(0, 3).join(" ");
 }
 
 export const maxDuration = 60;
@@ -59,19 +66,20 @@ export async function POST(request: NextRequest) {
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
 
-  // Tags les plus fréquents → niches détectées
   const allTags = products.flatMap(p => parseTags(p.tags ?? "").map(t => t.toLowerCase()));
   const tagCount: Record<string, number> = {};
   allTags.forEach(t => { tagCount[t] = (tagCount[t] ?? 0) + 1; });
   const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
 
-  // Top 6 produits (les premiers = mis en avant)
+  // Types produits détectés
+  const productTypes = [...new Set(products.map(p => p.product_type).filter(Boolean))].slice(0, 5);
+
   const topProducts = products.slice(0, 6);
 
-  // 3. Facebook Ads sur les 3 premiers produits (avec timeout global de 8s)
+  // 3. Facebook Ads sur les 3 premiers produits avec keyword pertinent
   const topProductsWithAds = await Promise.all(
     topProducts.map(async (p, i) => {
-      const keyword = p.title.split(" ").slice(0, 4).join(" ");
+      const keyword = buildAdKeyword(p);
       const adCount = i < 3 ? await Promise.race([
         countFacebookAds(keyword),
         new Promise<number>(res => setTimeout(() => res(0), 5000)),
@@ -86,6 +94,7 @@ export async function POST(request: NextRequest) {
         image,
         adCount: i < 3 ? adCount : null,
         saturation_score: satScore,
+        adKeyword: i < 3 ? keyword : null,
         handle: p.handle,
         productType: p.product_type,
         tags: parseTags(p.tags ?? "").slice(0, 3),
@@ -93,33 +102,60 @@ export async function POST(request: NextRequest) {
     })
   );
 
-  // 4. Analyse IA de la boutique
+  // Score de saturation global basé sur la niche principale
+  const nicheKeyword = topTags[0] ?? productTypes[0] ?? "";
+  const nicheAdCount = nicheKeyword ? await Promise.race([
+    countFacebookAds(nicheKeyword),
+    new Promise<number>(res => setTimeout(() => res(0), 5000)),
+  ]) : 0;
+  const nicheSaturation = adCountToSaturation(nicheAdCount as number);
+
+  // 4. Analyse IA avec données enrichies
   let aiAnalysis = null;
   if (process.env.OPENAI_API_KEY) {
     try {
-      const productSummary = topProducts.slice(0, 8).map(p =>
-        `- ${p.title} (${p.variants?.[0]?.price}€)`
+      const productSummary = topProducts.slice(0, 8).map(p => {
+        const keyword = buildAdKeyword(p);
+        return `- ${p.title} | Type: ${p.product_type || "N/A"} | Prix: ${p.variants?.[0]?.price}€`;
+      }).join("\n");
+
+      const adData = topProductsWithAds.slice(0, 3).map(p =>
+        `- "${p.adKeyword}": ${p.adCount} annonces FB actives → saturation ${p.saturation_score}/100`
       ).join("\n");
 
-      const prompt = `Tu es un expert en e-commerce dropshipping francophone.
-Analyse cette boutique Shopify et donne des insights stratégiques en JSON strict.
+      const prompt = `Tu es un expert en e-commerce dropshipping francophone. Analyse cette boutique Shopify avec des données réelles.
 
-Boutique : ${baseUrl}
+DONNÉES DE LA BOUTIQUE
+URL : ${baseUrl}
 Nombre de produits : ${products.length}
-Prix moyen : ${avgPrice.toFixed(2)}€ (min: ${minPrice}€, max: ${maxPrice}€)
+Types de produits : ${productTypes.join(", ") || "non renseignés"}
+Prix moyen : ${avgPrice.toFixed(2)}€ | min: ${minPrice}€ | max: ${maxPrice}€
 Tags principaux : ${topTags.join(", ")}
-Top produits :
+Saturation de la niche "${nicheKeyword}" : ${nicheSaturation}/100 (basé sur ${nicheAdCount} annonces FB actives en France)
+
+TOP PRODUITS :
 ${productSummary}
+
+SATURATION PAR PRODUIT (annonces Facebook Ads actives en France) :
+${adData}
+
+GRILLE DE SCORING (score_boutique) :
+- 0-30 : Niche très saturée ou boutique peu viable pour le dropshipping
+- 31-55 : Opportunités ciblées, positionnement différencié nécessaire
+- 56-75 : Bonne opportunité, marché accessible avec la bonne approche
+- 76-100 : Niche peu exploitée, fort potentiel de croissance
+
+Base ton score sur : la saturation réelle de la niche (donnée ci-dessus), la cohérence du catalogue, la gamme de prix (marges dropshipping possibles), et le potentiel de différenciation.
 
 Réponds UNIQUEMENT en JSON valide :
 {
   "niche_principale": "la niche principale de cette boutique",
   "positionnement": "positionnement marché en 1 phrase",
   "points_forts": ["point fort 1", "point fort 2", "point fort 3"],
-  "opportunites": ["opportunité 1", "opportunité 2"],
-  "produit_a_surveiller": "titre du produit le plus intéressant à analyser",
-  "conseil_principal": "conseil actionnable principal en 2 phrases",
-  "score_boutique": <nombre entre 0 et 100 représentant le potentiel de la boutique>
+  "opportunites": ["opportunité actionnable 1", "opportunité actionnable 2"],
+  "produit_a_surveiller": "titre exact du produit le plus intéressant",
+  "conseil_principal": "conseil concret et actionnable en 2 phrases maximum",
+  "score_boutique": <nombre entre 0 et 100 selon la grille ci-dessus>
 }`;
 
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -132,7 +168,7 @@ Réponds UNIQUEMENT en JSON valide :
           model: "gpt-4o-mini",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
-          temperature: 0.7,
+          temperature: 0.4,
         }),
       });
       if (res.ok) {
@@ -151,6 +187,8 @@ Réponds UNIQUEMENT en JSON valide :
     minPrice,
     maxPrice,
     topTags,
+    nicheSaturation,
+    nicheAdCount,
     topProducts: topProductsWithAds,
     aiAnalysis,
   });

@@ -13,6 +13,8 @@ type SpyResult = {
   minPrice: number;
   maxPrice: number;
   topTags: string[];
+  nicheSaturation?: number;
+  nicheAdCount?: number;
   topProducts: {
     id: number;
     title: string;
@@ -20,6 +22,7 @@ type SpyResult = {
     image: string | null;
     adCount: number | null;
     saturation_score: number | null;
+    adKeyword: string | null;
     handle: string;
     productType: string;
     tags: string[];
@@ -143,12 +146,13 @@ export function ShopifySpy() {
                 { label: "Produits", val: result.productCount.toString(), icon: "📦" },
                 { label: "Prix moyen", val: `${result.avgPrice}€`, icon: "💰" },
                 { label: "Prix min", val: `${result.minPrice}€`, icon: "⬇️" },
-                { label: "Prix max", val: `${result.maxPrice}€`, icon: "⬆️" },
-              ].map(({ label, val, icon }) => (
+                { label: "Saturation niche", val: result.nicheSaturation != null ? `${result.nicheSaturation}/100` : "N/A", icon: "📊", sub: result.nicheAdCount ? `${result.nicheAdCount} pubs FB` : undefined },
+              ].map(({ label, val, icon, sub }: { label: string; val: string; icon: string; sub?: string }) => (
                 <div key={label} className="bg-bg-soft rounded-xl p-3 border border-border text-center">
                   <div className="text-xl mb-1">{icon}</div>
                   <div className="font-heading font-bold text-primary text-lg">{val}</div>
                   <div className="text-xs text-text-muted">{label}</div>
+                  {sub && <div className="text-[0.6rem] text-text-muted mt-0.5">{sub}</div>}
                 </div>
               ))}
             </div>
@@ -229,8 +233,14 @@ export function ShopifySpy() {
                         <span className="text-xs text-text-muted">{p.adCount} pubs FB actives</span>
                       )}
                     </div>
-                    {p.saturation_score !== null && (
-                      <ScoreBar score={p.saturation_score} label="Saturation" colorMode="saturation" />
+                    {p.saturation_score !== null && p.adCount !== null && (
+                      <div className="space-y-1">
+                        <ScoreBar
+                          score={p.saturation_score}
+                          label={p.adCount > 0 ? `Saturation (${p.adCount} pubs FB sur "${p.adKeyword}")` : "Saturation (données FB non disponibles)"}
+                          colorMode="saturation"
+                        />
+                      </div>
                     )}
                     {p.tags.length > 0 && (
                       <div className="flex gap-1 overflow-x-auto scrollbar-hide">
