@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { countFacebookAds, adCountToSaturation } from "@/lib/facebook-ads";
 
+function parseTags(tags: string | string[]): string[] {
+  if (Array.isArray(tags)) return tags.map(t => t.trim()).filter(Boolean);
+  if (typeof tags === "string") return tags.split(",").map(t => t.trim()).filter(Boolean);
+  return [];
+}
+
 function normalizeShopifyUrl(input: string): string {
   let url = input.trim().toLowerCase();
   if (!url.startsWith("http")) url = "https://" + url;
@@ -54,7 +60,7 @@ export async function POST(request: NextRequest) {
   const maxPrice = Math.max(...prices);
 
   // Tags les plus fréquents → niches détectées
-  const allTags = products.flatMap(p => (p.tags ?? "").split(",").map((t: string) => t.trim().toLowerCase())).filter(Boolean);
+  const allTags = products.flatMap(p => parseTags(p.tags ?? "").map(t => t.toLowerCase()));
   const tagCount: Record<string, number> = {};
   allTags.forEach(t => { tagCount[t] = (tagCount[t] ?? 0) + 1; });
   const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
@@ -82,7 +88,7 @@ export async function POST(request: NextRequest) {
         saturation_score: satScore,
         handle: p.handle,
         productType: p.product_type,
-        tags: (p.tags ?? "").split(",").map((t: string) => t.trim()).filter(Boolean).slice(0, 3),
+        tags: parseTags(p.tags ?? "").slice(0, 3),
       };
     })
   );
