@@ -66,7 +66,12 @@ export async function POST(request: NextRequest) {
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
 
-  const allTags = products.flatMap(p => parseTags(p.tags ?? "").map(t => t.toLowerCase()));
+  const isInternalTag = (t: string) =>
+    t.startsWith("__") || t.includes(":") || t.startsWith("_") || t.length > 60;
+
+  const allTags = products.flatMap(p =>
+    parseTags(p.tags ?? "").map(t => t.toLowerCase()).filter(t => !isInternalTag(t))
+  );
   const tagCount: Record<string, number> = {};
   allTags.forEach(t => { tagCount[t] = (tagCount[t] ?? 0) + 1; });
   const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
