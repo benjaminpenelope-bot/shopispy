@@ -31,7 +31,7 @@ export function Hero() {
       <div className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-8">
         {/* Badges */}
         <div className="fade-up delay-0 flex flex-wrap items-center justify-center gap-2">
-          {["Beta privée", "Marché FR", "Accès fondateur"].map((b) => (
+          {["Beta privée", "Accès fondateur"].map((b) => (
             <span key={b} className="inline-flex items-center gap-1.5 font-mono text-[0.65rem] font-semibold text-primary bg-primary/8 border border-primary/20 px-3 py-1 rounded-full tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
               {b}
