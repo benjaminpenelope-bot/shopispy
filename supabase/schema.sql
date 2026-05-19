@@ -113,3 +113,29 @@ create policy "usage_own" on public.user_usage
 create policy "usage_service" on public.user_usage
   for all using (true)
   with check (true);
+
+
+-- ── Scan history ─────────────────────────────────
+create table if not exists public.scan_history (
+  id             uuid primary key default uuid_generate_v4(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  url            text not null,
+  product_count  int,
+  avg_price      numeric(10, 2),
+  niche          text,
+  score          smallint,
+  theme_name     text,
+  theme_category text,
+  created_at     timestamptz not null default now()
+);
+
+alter table public.scan_history enable row level security;
+
+create policy "scan_history_own" on public.scan_history
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Permet l'insert depuis le service role
+create policy "scan_history_service" on public.scan_history
+  for all using (true)
+  with check (true);

@@ -289,3 +289,44 @@ export async function fetchTraffic(domain: string): Promise<TrafficData | null> 
     return null;
   }
 }
+
+// ─── Similar sites ───────────────────────────────────────────────────────────
+export type SimilarSite = {
+  domain: string;
+  title: string;
+  visits: number | null;
+  globalRank: number | null;
+  topCountry: string | null;
+  favicon: string | null;
+};
+
+export async function fetchSimilarSites(domain: string): Promise<SimilarSite[]> {
+  const key = process.env.RAPIDAPI_KEY;
+  if (!key) return [];
+
+  try {
+    const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const HOST = "similarweb-insights.p.rapidapi.com";
+    const res = await Promise.race([
+      fetch(`https://${HOST}/similar-sites?domain=${encodeURIComponent(cleanDomain)}`, {
+        headers: { "X-RapidAPI-Key": key, "X-RapidAPI-Host": HOST },
+      }),
+      new Promise<null>((_, r) => setTimeout(() => r(new Error("timeout")), 7000)),
+    ]);
+
+    if (!res || !(res instanceof Response) || !res.ok) return [];
+    const raw = await res.json();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (raw?.SimilarSites ?? []).slice(0, 5).map((s: any) => ({
+      domain: s.Domain ?? "",
+      title: s.Title ?? s.Domain ?? "",
+      visits: s.Visits ? Math.round(s.Visits) : null,
+      globalRank: s.GlobalRank ?? null,
+      topCountry: s.TopCountry?.CountryName?.split(" ")[0] ?? null,
+      favicon: s.Images?.Favicon ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}

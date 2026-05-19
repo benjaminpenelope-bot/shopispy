@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ScoreBar } from "@/components/ui/ScoreBar";
 import { ScoreGauge } from "@/components/ui/ScoreGauge";
 import { formatPrice } from "@/lib/utils";
@@ -19,6 +19,16 @@ type SpyProduct = Product & {
   adCount: number | null;
   saturation_score: number | null;
   adKeyword: string | null;
+  opportunityScore: number;
+};
+
+type SimilarSite = {
+  domain: string;
+  title: string;
+  visits: number | null;
+  globalRank: number | null;
+  topCountry: string | null;
+  favicon: string | null;
 };
 
 type BestSeller = Product & { fromCollection: boolean };
@@ -49,6 +59,7 @@ type SpyResult = {
   theme: { rawName: string; displayName: string; category: "free" | "premium" | "custom" } | null;
   detectedApps: string[];
   traffic: TrafficData | null;
+  similarSites: SimilarSite[];
   aiAnalysis: {
     niche_principale: string;
     positionnement: string;
@@ -70,11 +81,16 @@ function formatVisits(n: number): string {
   return n.toString();
 }
 
-export function ShopifySpy() {
-  const [url, setUrl] = useState("");
+export function ShopifySpy({ initialUrl }: { initialUrl?: string }) {
+  const [url, setUrl] = useState(initialUrl ?? "");
   const [state, setState] = useState<State>("idle");
   const [result, setResult] = useState<SpyResult | null>(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (initialUrl) analyze(initialUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function analyze(targetUrl?: string) {
     const query = (targetUrl ?? url).trim();
@@ -402,6 +418,43 @@ export function ShopifySpy() {
             </div>
           </div>
 
+          {/* ── Score d'opportunité produit ── */}
+          {result.topProducts.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading font-bold text-base text-white">Score d'opportunité</h3>
+                <span className="font-mono text-[0.6rem] text-[#52525b] bg-[#161616] border border-[#222] px-2 py-0.5 rounded-full tracking-wider">PRODUITS</span>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl overflow-hidden">
+                {[...result.topProducts]
+                  .sort((a, b) => b.opportunityScore - a.opportunityScore)
+                  .slice(0, 6)
+                  .map((p, i) => {
+                    const color = p.opportunityScore >= 80 ? "#00ff87" : p.opportunityScore >= 50 ? "#f59e0b" : "#71717a";
+                    return (
+                      <div key={p.id} className={`flex items-center gap-4 px-4 py-3 ${i < result.topProducts.length - 1 ? "border-b border-[#161616]" : ""}`}>
+                        <span className="font-mono text-[0.65rem] text-[#3f3f46] w-4 flex-shrink-0">#{i + 1}</span>
+                        {p.image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.image} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 opacity-80" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-white font-medium truncate">{p.title}</p>
+                          <p className="text-[0.65rem] text-[#52525b] font-mono">{p.price > 0 ? `${p.price}€` : "—"}{p.productType ? ` · ${p.productType}` : ""}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="w-16 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${p.opportunityScore}%`, background: color }} />
+                          </div>
+                          <span className="font-mono text-xs font-bold w-8 text-right" style={{ color }}>{p.opportunityScore}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* ── Tous les produits avec saturation ── */}
           {result.topProducts.some(p => p.saturation_score !== null) && (
             <div className="space-y-3">
@@ -414,6 +467,52 @@ export function ShopifySpy() {
                     label={`${p.title.slice(0, 40)}${p.title.length > 40 ? "…" : ""} — "${p.adKeyword}"`}
                     colorMode="saturation"
                   />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Boutiques similaires ── */}
+          {result.similarSites && result.similarSites.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading font-bold text-base text-white">Boutiques similaires</h3>
+                <span className="font-mono text-[0.6rem] text-[#52525b] bg-[#161616] border border-[#222] px-2 py-0.5 rounded-full tracking-wider">CONCURRENTS</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {result.similarSites.map(site => (
+                  <div key={site.domain} className="bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl p-4 flex items-start gap-3 hover:border-[#2a2a2a] transition-colors">
+                    {site.favicon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={site.favicon} alt="" className="w-8 h-8 rounded-lg flex-shrink-0 bg-[#161616]" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg flex-shrink-0 bg-[#161616] border border-[#222] flex items-center justify-center text-xs text-[#52525b]">
+                        {site.domain[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-heading font-bold text-sm text-white truncate">{site.domain}</p>
+                        <button
+                          onClick={() => analyze(site.domain)}
+                          className="font-mono text-[0.6rem] text-primary border border-primary/20 bg-primary/5 px-2 py-0.5 rounded-md hover:bg-primary/10 transition-colors flex-shrink-0"
+                        >
+                          Scanner →
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {site.visits && (
+                          <span className="font-mono text-[0.65rem] text-[#52525b]">👁 {formatVisits(site.visits)}/mois</span>
+                        )}
+                        {site.globalRank && (
+                          <span className="font-mono text-[0.65rem] text-[#52525b]">🌐 #{site.globalRank.toLocaleString("fr")}</span>
+                        )}
+                        {site.topCountry && (
+                          <span className="font-mono text-[0.65rem] text-[#52525b]">📍 {site.topCountry}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

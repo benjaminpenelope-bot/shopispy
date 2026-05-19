@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 const NAV = [
   { href: "/dashboard/search", label: "Recherche produits", icon: "🔍" },
   { href: "/dashboard/spy", label: "Analyser boutique", icon: "🕵️" },
+  { href: "/dashboard/history", label: "Historique scans", icon: "🕘" },
   { href: "/dashboard/clones", label: "Mes fiches IA", icon: "✨" },
 ];
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { adCountToSaturation } from "@/lib/facebook-ads";
 import { incrementUsage } from "@/lib/usage";
-import { detectTheme, detectApps, fetchBestSellers, fetchTraffic, type ThemeInfo } from "@/lib/shopify-intel";
+import { detectTheme, detectApps, fetchBestSellers, fetchTraffic, fetchSimilarSites, type ThemeInfo } from "@/lib/shopify-intel";
 
 function parseTags(tags: string | string[]): string[] {
   if (Array.isArray(tags)) return tags.map(t => t.trim()).filter(Boolean);
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   const topProducts = products.slice(0, 6);
 
   // 3. Analyse HTML : thème + apps + best sellers + trafic — en parallèle
-  const [htmlResult, bestSellersRaw, trafficData] = await Promise.all([
+  const [htmlResult, bestSellersRaw, trafficData, similarSites] = await Promise.all([
     // Fetch homepage pour thème et apps
     (async (): Promise<{ theme: ThemeInfo | null; apps: string[] }> => {
       try {
@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
     })(),
     fetchBestSellers(baseUrl),
     fetchTraffic(baseUrl.replace(/^https?:\/\//, "")),
+    fetchSimilarSites(baseUrl.replace(/^https?:\/\//, "")),
   ]);
 
   const { theme, apps } = htmlResult;
@@ -114,11 +115,26 @@ export async function POST(request: NextRequest) {
     fromCollection: bestSellersRaw.length > 0,
   }));
 
-  // 4. Saturation niche (FB désactivé → 0)
+  // 4. Saturation niche (FB désactivé → 0) + score d'opportunité produit
   const topProductsWithAds = topProducts.map(p => {
     const keyword = buildAdKeyword(p);
     const price = parseFloat(p.variants?.[0]?.price ?? "0");
     const image = p.images?.[0]?.src ?? null;
+    const variantCount = p.variants?.length ?? 1;
+
+    // Opportunity score: heuristic based on price range + variant simplicity + type presence
+    const priceScore = (() => {
+      if (price <= 0) return 0;
+      if (price >= 15 && price <= 80) return 40; // ideal dropshipping range
+      if (price > 80 && price <= 150) return 25;
+      if (price > 150) return 10;
+      return 15; // below 15€
+    })();
+    const variantScore = variantCount <= 3 ? 30 : variantCount <= 8 ? 20 : variantCount <= 15 ? 10 : 5;
+    const typeScore = p.product_type?.trim() ? 20 : 0;
+    const imageScore = p.images?.length > 0 ? 10 : 0;
+    const opportunityScore = Math.min(100, priceScore + variantScore + typeScore + imageScore);
+
     return {
       id: p.id,
       title: p.title,
@@ -130,6 +146,7 @@ export async function POST(request: NextRequest) {
       handle: p.handle,
       productType: p.product_type,
       tags: parseTags(p.tags ?? "").slice(0, 3),
+      opportunityScore,
     };
   });
 
@@ -220,9 +237,22 @@ Réponds UNIQUEMENT en JSON valide :
     }
   }
 
-  if (user) await incrementUsage(user.id, "spy_scans");
+  if (user) {
+    await incrementUsage(user.id, "spy_scans");
+    // Save to scan history (fire and forget)
+    supabase.from("scan_history").insert({
+      user_id: user.id,
+      url: baseUrl,
+      product_count: products.length,
+      avg_price: Math.round(avgPrice * 100) / 100,
+      niche: aiAnalysis?.niche_principale ?? null,
+      score: aiAnalysis?.score_boutique ?? null,
+      theme_name: theme?.displayName ?? null,
+      theme_category: theme?.category ?? null,
+    }).then(() => {});
+  }
 
-  return NextResponse.json({
+  const payload = {
     url: baseUrl,
     productCount: products.length,
     avgPrice: Math.round(avgPrice * 100) / 100,
@@ -237,6 +267,9 @@ Réponds UNIQUEMENT en JSON valide :
     theme,
     detectedApps: apps,
     traffic: trafficData,
+    similarSites,
     aiAnalysis,
-  });
+  };
+
+  return NextResponse.json(payload);
 }
