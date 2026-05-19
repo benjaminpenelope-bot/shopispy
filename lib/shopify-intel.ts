@@ -217,7 +217,7 @@ export async function fetchTraffic(domain: string): Promise<TrafficData | null> 
   try {
     const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
     const HOST = "similarweb-insights.p.rapidapi.com";
-    const url = `https://${HOST}/?domain=${encodeURIComponent(cleanDomain)}`;
+    const url = `https://${HOST}/traffic?domain=${encodeURIComponent(cleanDomain)}`;
 
     const res = await Promise.race([
       fetch(url, {
