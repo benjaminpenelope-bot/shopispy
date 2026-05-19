@@ -216,47 +216,85 @@ export async function fetchTraffic(domain: string): Promise<TrafficData | null> 
 
   try {
     const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const url = `https://similarweb.p.rapidapi.com/v1/similar-rank?domain=${encodeURIComponent(cleanDomain)}`;
+    const HOST = "similarweb-insights.p.rapidapi.com";
+    const url = `https://${HOST}/?domain=${encodeURIComponent(cleanDomain)}`;
+
     const res = await Promise.race([
       fetch(url, {
         headers: {
           "X-RapidAPI-Key": key,
-          "X-RapidAPI-Host": "similarweb.p.rapidapi.com",
+          "X-RapidAPI-Host": HOST,
         },
       }),
-      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 7000)),
     ]);
-    if (!res || !(res instanceof Response) || !res.ok) return null;
 
+    if (!res || !(res instanceof Response)) return null;
     const raw = await res.json();
 
-    // SimilarWeb response shape
-    const visits = raw?.SimilarityRank?.Site?.EstimatedMonthlyVisits
-      ?? raw?.EstimatedMonthlyVisits
-      ?? null;
+    // Log raw response for first-run debugging (visible in Vercel function logs)
+    console.log("[SimilarWeb Insights] status:", (res as Response).status);
+    console.log("[SimilarWeb Insights] raw:", JSON.stringify(raw).slice(0, 800));
 
-    const globalRank = raw?.SimilarityRank?.Rank ?? null;
+    if (!(res as Response).ok) return null;
 
-    const topCountries = (raw?.TopCountryShares ?? [])
-      .slice(0, 5)
-      .map((c: any) => ({
-        country: c.Country ?? c.country ?? "",
-        countryCode: c.CountryCode ?? c.countryCode ?? "",
-        share: Math.round((c.Value ?? c.share ?? 0) * 100),
-      }));
+    // Flexible parsing — tries multiple possible field names
+    const visits: number | null =
+      raw?.monthly_visits ??
+      raw?.monthlyVisits ??
+      raw?.Monthly_Visits ??
+      raw?.EstimatedMonthlyVisits ??
+      raw?.visits ??
+      raw?.traffic?.monthly_visits ??
+      raw?.traffic?.visits ??
+      raw?.overview?.monthly_visits ??
+      null;
 
-    const src = raw?.TrafficSources ?? null;
+    const globalRank: number | null =
+      raw?.global_rank ??
+      raw?.globalRank ??
+      raw?.Global_Rank ??
+      raw?.rank ??
+      raw?.Rank ??
+      null;
+
+    const rawCountries: any[] =
+      raw?.top_countries ??
+      raw?.topCountries ??
+      raw?.Top_Countries ??
+      raw?.countries ??
+      raw?.TopCountryShares ??
+      raw?.traffic_by_country ??
+      [];
+
+    const topCountries = rawCountries.slice(0, 5).map((c: any) => ({
+      country: c.country ?? c.Country ?? c.name ?? c.Name ?? "",
+      countryCode: c.country_code ?? c.countryCode ?? c.CountryCode ?? c.code ?? "",
+      share: (() => {
+        const v = c.share ?? c.Share ?? c.value ?? c.Value ?? c.percentage ?? 0;
+        return Math.round(v > 1 ? v : v * 100);
+      })(),
+    }));
+
+    const src =
+      raw?.traffic_sources ??
+      raw?.trafficSources ??
+      raw?.Traffic_Sources ??
+      raw?.TrafficSources ??
+      null;
+
     const trafficSources = src ? {
-      direct:   Math.round((src.Direct   ?? 0) * 100),
-      search:   Math.round((src.Search   ?? 0) * 100),
-      social:   Math.round((src.SocialNetworks ?? src.Social ?? 0) * 100),
-      email:    Math.round((src.Mail     ?? src.Email ?? 0) * 100),
-      paid:     Math.round((src.PaidReferrals ?? src.Paid ?? 0) * 100),
-      referral: Math.round((src.Referrals ?? src.Referral ?? 0) * 100),
+      direct:   Math.round((src.direct   ?? src.Direct   ?? 0) > 1 ? (src.direct ?? src.Direct ?? 0) : (src.direct ?? src.Direct ?? 0) * 100),
+      search:   Math.round((src.search   ?? src.Search   ?? src.organic ?? 0) > 1 ? (src.search ?? src.Search ?? src.organic ?? 0) : (src.search ?? src.Search ?? src.organic ?? 0) * 100),
+      social:   Math.round((src.social   ?? src.Social   ?? src.SocialNetworks ?? 0) > 1 ? (src.social ?? src.Social ?? src.SocialNetworks ?? 0) : (src.social ?? src.Social ?? src.SocialNetworks ?? 0) * 100),
+      email:    Math.round((src.email    ?? src.Email    ?? src.Mail ?? 0) > 1 ? (src.email ?? src.Email ?? src.Mail ?? 0) : (src.email ?? src.Email ?? src.Mail ?? 0) * 100),
+      paid:     Math.round((src.paid     ?? src.Paid     ?? src.PaidReferrals ?? 0) > 1 ? (src.paid ?? src.Paid ?? src.PaidReferrals ?? 0) : (src.paid ?? src.Paid ?? src.PaidReferrals ?? 0) * 100),
+      referral: Math.round((src.referral ?? src.Referral ?? src.Referrals ?? 0) > 1 ? (src.referral ?? src.Referral ?? src.Referrals ?? 0) : (src.referral ?? src.Referral ?? src.Referrals ?? 0) * 100),
     } : null;
 
     return { monthlyVisits: visits, topCountries, trafficSources, globalRank };
-  } catch {
+  } catch (e) {
+    console.log("[SimilarWeb Insights] error:", e);
     return null;
   }
 }
