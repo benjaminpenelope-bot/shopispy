@@ -1,21 +1,5 @@
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY!;
-const HOST = "facebook-ads-library-scraper-api.p.rapidapi.com";
-
-export async function countFacebookAds(keyword: string, country = "FR"): Promise<number> {
-  try {
-    const url = `https://${HOST}/search/ads?query=${encodeURIComponent(keyword)}&country=${country}&status=ACTIVE&limit=1`;
-    const res = await fetch(url, {
-      headers: {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": HOST,
-      },
-    });
-    if (!res.ok) return 0;
-    const data = await res.json();
-    return data?.searchResultsCount ?? 0;
-  } catch {
-    return 0;
-  }
+export async function countFacebookAds(_keyword: string, _country = "FR"): Promise<number> {
+  return 0;
 }
 
 // Convertit le nombre de pubs en score de saturation (0-100)
