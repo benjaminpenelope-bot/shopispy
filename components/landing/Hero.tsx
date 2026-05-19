@@ -20,6 +20,11 @@ export function Hero() {
           backgroundSize: "48px 48px",
         }}
       />
+      {/* Scan line */}
+      <div className="absolute inset-x-0 pointer-events-none z-20" style={{ animation: "scanDown 4s linear infinite" }}>
+        <div className="w-full h-px bg-primary/40" style={{ boxShadow: "0 0 12px 2px rgba(0,255,135,0.3), 0 0 40px 8px rgba(0,255,135,0.08)" }} />
+        <div className="w-full h-16 bg-gradient-to-b from-primary/5 to-transparent" />
+      </div>
       {/* Glow orb */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
