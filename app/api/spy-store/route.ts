@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { adCountToSaturation } from "@/lib/facebook-ads";
 import { incrementUsage } from "@/lib/usage";
-import { detectTheme, detectApps, fetchBestSellers, fetchTraffic } from "@/lib/shopify-intel";
+import { detectTheme, detectApps, fetchBestSellers, fetchTraffic, type ThemeInfo } from "@/lib/shopify-intel";
 
 function parseTags(tags: string | string[]): string[] {
   if (Array.isArray(tags)) return tags.map(t => t.trim()).filter(Boolean);
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
   // 3. Analyse HTML : thème + apps + best sellers + trafic — en parallèle
   const [htmlResult, bestSellersRaw, trafficData] = await Promise.all([
     // Fetch homepage pour thème et apps
-    (async () => {
+    (async (): Promise<{ theme: ThemeInfo | null; apps: string[] }> => {
       try {
         const res = await fetch(baseUrl, {
           headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
         : "";
 
       const techSummary = [
-        theme ? `Thème Shopify : ${theme}` : "",
+        theme ? `Thème Shopify : ${theme.displayName}${theme.category === "premium" ? " (premium)" : theme.category === "free" ? " (gratuit)" : " (sur mesure)"}` : "",
         apps.length > 0 ? `Apps détectées : ${apps.join(", ")}` : "Aucune app détectée",
         trafficData?.monthlyVisits ? `Trafic mensuel estimé : ${trafficData.monthlyVisits.toLocaleString("fr")} visites` : "",
         trafficData?.globalRank ? `Classement mondial : #${trafficData.globalRank.toLocaleString("fr")}` : "",

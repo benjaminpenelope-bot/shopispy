@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
-import { Badge } from "@/components/ui/Badge";
 import { ScoreBar } from "@/components/ui/ScoreBar";
 import { ScoreGauge } from "@/components/ui/ScoreGauge";
 import { formatPrice } from "@/lib/utils";
+import { APP_LINKS } from "@/lib/shopify-intel";
 
 type Product = {
   id: number;
@@ -45,7 +45,7 @@ type SpyResult = {
   topProducts: SpyProduct[];
   bestSellers: BestSeller[];
   bestSellersFromCollection: boolean;
-  theme: string | null;
+  theme: { rawName: string; displayName: string; category: "free" | "premium" | "custom" } | null;
   detectedApps: string[];
   traffic: TrafficData | null;
   aiAnalysis: {
@@ -215,7 +215,11 @@ export function ShopifySpy() {
             </div>
             {result.topTags.length > 0 && (
               <div className="px-5 pb-4 flex gap-2 flex-wrap">
-                {result.topTags.map(tag => <Badge key={tag}>{tag}</Badge>)}
+                {result.topTags.map(tag => (
+                  <span key={tag} className="font-mono text-[0.65rem] text-[#71717a] bg-[#161616] border border-[#222] px-2.5 py-1 rounded-md">
+                    {tag}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -300,26 +304,50 @@ export function ShopifySpy() {
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider uppercase">Stack technique</p>
               </div>
+
               {result.theme && (
                 <div className="flex items-center gap-3">
-                  <span className="text-sm">🎨</span>
-                  <div>
-                    <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider">THÈME SHOPIFY</p>
-                    <p className="font-heading font-bold text-white text-sm mt-0.5">{result.theme}</p>
+                  <span className="text-lg">🎨</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-heading font-bold text-white text-sm">{result.theme.displayName}</p>
+                    <span className={`font-mono text-[0.6rem] px-2 py-0.5 rounded-full border tracking-wider ${
+                      result.theme.category === "free"
+                        ? "text-[#52525b] border-[#2a2a2a] bg-[#161616]"
+                        : result.theme.category === "premium"
+                        ? "text-[#f59e0b] border-[#f59e0b]/20 bg-[#f59e0b]/8"
+                        : "text-primary border-primary/20 bg-primary/8"
+                    }`}>
+                      {result.theme.category === "free" ? "GRATUIT" : result.theme.category === "premium" ? "PREMIUM" : "SUR MESURE"}
+                    </span>
                   </div>
                 </div>
               )}
+
               {result.detectedApps.length > 0 && (
                 <div>
                   <p className="font-mono text-[0.6rem] text-[#52525b] tracking-wider mb-2">
                     APPS DÉTECTÉES ({result.detectedApps.length})
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {result.detectedApps.map(app => (
-                      <span key={app} className="bg-[#161616] border border-[#222] text-xs text-[#a1a1aa] font-mono px-2.5 py-1 rounded-lg hover:border-primary/20 transition-colors">
-                        {app}
-                      </span>
-                    ))}
+                    {result.detectedApps.map(app => {
+                      const link = APP_LINKS[app];
+                      return link ? (
+                        <a
+                          key={app}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-[#161616] border border-[#222] text-xs text-[#a1a1aa] font-mono px-2.5 py-1 rounded-lg hover:border-primary/30 hover:text-primary transition-colors flex items-center gap-1"
+                        >
+                          {app}
+                          <span className="text-[0.6rem] opacity-50">↗</span>
+                        </a>
+                      ) : (
+                        <span key={app} className="bg-[#161616] border border-[#222] text-xs text-[#a1a1aa] font-mono px-2.5 py-1 rounded-lg">
+                          {app}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -353,11 +381,6 @@ export function ShopifySpy() {
                         <span className="font-mono text-[0.65rem] text-[#52525b] truncate ml-2">{p.productType}</span>
                       )}
                     </div>
-                    {p.tags.length > 0 && (
-                      <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-                        {p.tags.map(t => <Badge key={t}>{t}</Badge>)}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}

@@ -57,21 +57,56 @@ const APP_SIGNATURES: { name: string; pattern: RegExp }[] = [
   { name: "Tracktor",      pattern: /tracktor\.in/i },
 ];
 
-// ─── Theme detection ────────────────────────────────────────────────────────
-export function detectTheme(html: string): string | null {
-  // Shopify.theme = { "name": "..." } — most stores
+// ─── Theme detection + categorization ───────────────────────────────────────
+const FREE_THEMES = new Set([
+  "dawn", "craft", "crave", "debut", "brooklyn", "narrative", "simple", "supply",
+  "venture", "minimal", "boundless", "express", "publisher", "sense", "refresh",
+  "studio", "origin", "ride", "colorblock", "taste", "spotlight", "announcement bar",
+]);
+
+const PREMIUM_THEMES = new Set([
+  "prestige", "impulse", "turbo", "empire", "motion", "flex", "boost", "pacific",
+  "focal", "symmetry", "pipeline", "testament", "editions", "retina", "archetype",
+  "warehouse", "avenue", "canopy", "district", "mr parker", "venue", "vogue",
+  "handy", "label", "grid", "masonry", "bespoke", "kingdom", "gear", "split",
+  "launch", "kagami", "reshape", "streamline", "context", "broadcast", "impact",
+  "be yours", "palo alto", "california", "mojave", "cascade", "eurus", "envy",
+  "blockshop", "showcase", "ticket", "standout", "modular", "editorial",
+  "hero", "stiletto", "debutify", "booster", "shoptimized", "fastor",
+  "electro", "roam", "portland", "exhibition", "reformation", "local",
+  "dubai", "miami", "oslo", "stockholm", "tokyo", "paris",
+]);
+
+export type ThemeInfo = {
+  rawName: string;
+  displayName: string;
+  category: "free" | "premium" | "custom";
+};
+
+function rawThemeName(html: string): string | null {
   const m1 = html.match(/Shopify\.theme\s*=\s*\{[^}]*["']name["']\s*:\s*["']([^"']+)["']/);
   if (m1) return m1[1];
-
-  // window.Shopify.theme
   const m2 = html.match(/window\.Shopify\.theme\s*=\s*\{[^}]*["']name["']\s*:\s*["']([^"']+)["']/);
   if (m2) return m2[1];
-
-  // meta[name="theme-id"] or similar in head
   const m3 = html.match(/["']theme_name["']\s*:\s*["']([^"']+)["']/);
   if (m3) return m3[1];
-
   return null;
+}
+
+export function detectTheme(html: string): ThemeInfo | null {
+  const raw = rawThemeName(html);
+  if (!raw) return null;
+  const lower = raw.toLowerCase().trim();
+
+  if (FREE_THEMES.has(lower)) {
+    return { rawName: raw, displayName: raw, category: "free" };
+  }
+  for (const t of PREMIUM_THEMES) {
+    if (lower === t || lower.startsWith(t + " ") || lower.startsWith(t + "-")) {
+      return { rawName: raw, displayName: raw, category: "premium" };
+    }
+  }
+  return { rawName: raw, displayName: "Thème personnalisé", category: "custom" };
 }
 
 // ─── Apps detection ─────────────────────────────────────────────────────────
@@ -80,6 +115,55 @@ export function detectApps(html: string): string[] {
     .filter(({ pattern }) => pattern.test(html))
     .map(({ name }) => name);
 }
+
+export const APP_LINKS: Record<string, string> = {
+  "Klaviyo":                   "https://apps.shopify.com/klaviyo-email-marketing",
+  "Omnisend":                  "https://apps.shopify.com/omnisend",
+  "Privy":                     "https://apps.shopify.com/privy",
+  "Mailchimp":                 "https://apps.shopify.com/mailchimp",
+  "Postscript":                "https://apps.shopify.com/postscript-sms-marketing",
+  "SMSBump":                   "https://apps.shopify.com/sms-bump",
+  "Brevo":                     "https://apps.shopify.com/brevo",
+  "Judge.me":                  "https://apps.shopify.com/judgeme",
+  "Loox":                      "https://apps.shopify.com/loox",
+  "Yotpo":                     "https://apps.shopify.com/yotpo",
+  "Stamped.io":                "https://apps.shopify.com/stamped-io",
+  "Okendo":                    "https://apps.shopify.com/okendo",
+  "Ali Reviews":               "https://apps.shopify.com/ali-reviews",
+  "ReConvert":                 "https://apps.shopify.com/reconvert-upsell-cross-sell",
+  "Zipify OCU":                "https://apps.shopify.com/zipify-one-click-upsell",
+  "Bold Upsell":               "https://apps.shopify.com/product-upsell",
+  "Candy Rack":                "https://apps.shopify.com/candy-rack",
+  "Frequently Bought Together":"https://apps.shopify.com/frequently-bought-together",
+  "PageFly":                   "https://apps.shopify.com/pagefly",
+  "GemPages":                  "https://apps.shopify.com/gempages",
+  "Shogun":                    "https://apps.shopify.com/shogun",
+  "Zipify Pages":              "https://apps.shopify.com/zipify-pages",
+  "Tidio":                     "https://apps.shopify.com/tidio-chat",
+  "Gorgias":                   "https://apps.shopify.com/gorgias",
+  "Zendesk":                   "https://apps.shopify.com/zendesk",
+  "Intercom":                  "https://apps.shopify.com/intercom",
+  "Drift":                     "https://apps.shopify.com/drift",
+  "Hotjar":                    "https://apps.shopify.com/hotjar",
+  "Lucky Orange":              "https://apps.shopify.com/lucky-orange",
+  "Microsoft Clarity":         "https://clarity.microsoft.com",
+  "Facebook Pixel":            "https://apps.shopify.com/facebook",
+  "TikTok Pixel":              "https://apps.shopify.com/tiktok",
+  "Pinterest":                 "https://apps.shopify.com/pinterest-4",
+  "Snapchat Pixel":            "https://apps.shopify.com/snapchat",
+  "Google Ads":                "https://apps.shopify.com/google",
+  "Smile.io":                  "https://apps.shopify.com/smile-io",
+  "LoyaltyLion":               "https://apps.shopify.com/loyaltylion",
+  "ReferralCandy":             "https://apps.shopify.com/referralcandy",
+  "Aftership":                 "https://apps.shopify.com/aftership",
+  "LimeSpot":                  "https://apps.shopify.com/limespot-personalizer",
+  "Back In Stock":             "https://apps.shopify.com/back-in-stock",
+  "Wheelio":                   "https://apps.shopify.com/wheelio-spin-the-wheel-pop-ups",
+  "Spin-a-Sale":               "https://apps.shopify.com/spin-a-sale",
+  "Growave":                   "https://apps.shopify.com/social-login-growave",
+  "Recart":                    "https://apps.shopify.com/recart",
+  "Tracktor":                  "https://apps.shopify.com/tracktor",
+};
 
 // ─── Best sellers ────────────────────────────────────────────────────────────
 const BEST_SELLER_SLUGS = [
